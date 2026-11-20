@@ -267,8 +267,8 @@ th small { display: block; font-family: var(--font-body); font-weight: 400; colo
 .fc-day .risk-wrap { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
 .fc-day .risk-wrap:empty { display: none; }
 .fc-day .risk-wrap .chip { font-size: .68rem; padding: 0 7px; }
-.fc-sections { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-top: 10px; overflow: hidden; background: var(--line); }
-.fc-sec { background: var(--surface); padding: 12px 14px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: center; }
+.fc-sections { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 10px; overflow: hidden; }
+.fc-sec { background: var(--surface); border-left: 1px solid var(--line); border-top: 1px solid var(--line); margin: -1px 0 0 -1px; padding: 12px 14px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: center; }
 .fc-sec .wx { width: 34px; height: 34px; grid-row: span 3; }
 .fc-sec .sn { font-size: .78rem; color: var(--muted); }
 .fc-sec .sv { font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; }
@@ -286,6 +286,38 @@ th small { display: block; font-family: var(--font-body); font-weight: 400; colo
   .fc-day .dm span { justify-content: flex-end; }
   .fc-day .risk-wrap { grid-area: k; justify-content: flex-start; }
   .fc-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- Modellauswahl, Matrix ---------- */
+.fc-picker { padding: 12px 14px; display: grid; gap: 8px; margin-bottom: 10px; }
+.mp-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mp-row .gl { width: 92px; flex: none; font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-family: var(--font-display); font-weight: 600; }
+.mp { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 11px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg-2); cursor: pointer; font: inherit; font-size: .88rem; font-weight: 600; }
+.mp small { font-weight: 500; color: var(--muted); font-size: .74rem; }
+.mp:hover { border-color: var(--line-2); color: var(--fg); }
+.mp[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.mp[aria-pressed="true"] small { color: color-mix(in srgb, var(--bg) 72%, transparent); }
+.fc-minfo { font-size: .9rem; color: var(--fg-2); margin: 0 2px 14px; display: flex; gap: 4px 12px; flex-wrap: wrap; align-items: baseline; }
+.fc-minfo b { color: var(--fg); font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; }
+.fc-days-wrap { overflow-x: auto; padding: 2px; margin: -2px; }
+.sub-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; margin: 34px 0 12px; }
+.sub-head h3 { font-size: 1.4rem; }
+.sub-head p { margin: 4px 0 0; color: var(--fg-2); font-size: .92rem; max-width: 75ch; }
+table.mm td.mmv { text-align: center; min-width: 64px; }
+table.mm td.part { font-style: italic; }
+table.mm tr.sel td { box-shadow: inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent); }
+table.mm tr.agree td { background: var(--surface-2); }
+table.mm .mrow { display: flex; flex-direction: column; align-items: flex-start; border: 0; background: none; padding: 0; color: var(--fg); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+table.mm .mrow small { color: var(--muted); font-weight: 400; font-size: .72rem; }
+table.mm button.mrow:hover { color: var(--accent); }
+@media (max-width: 860px) { .fc-days { grid-template-columns: minmax(0, 1fr) !important; } }
+.mp-chips { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+@media (max-width: 600px) {
+  .fc-picker { gap: 10px; }
+  .mp-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .mp-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px 2px; }
+  .mp-chips::-webkit-scrollbar { display: none; }
+  .mp { flex: none; }
 }
 
 /* ---------- Footer & Dialog ---------- */
@@ -425,13 +457,27 @@ footer p { margin: 4px 0; max-width: 100ch; }
       <span class="chip" id="fc-state" style="--c:var(--good)"><i></i>Keine Warnungen</span>
     </div>
     <div class="fc-alerts" id="fc-alerts" role="status"></div>
-    <div class="fc-days" id="fc-days" role="group" aria-label="Tage"></div>
+    <div class="card fc-picker" id="fc-picker" role="group" aria-label="Wettermodell"></div>
+    <div class="fc-minfo" id="fc-minfo"></div>
+    <div class="fc-days-wrap"><div class="fc-days" id="fc-days" role="group" aria-label="Tage"></div></div>
     <div class="card fc-sections" id="fc-sections"></div>
-    <div class="chart-grid" style="margin-top:14px">
-      <figure class="card chart-card span2"><figcaption><span class="t">Temperatur: gemessen und vorhergesagt</span><span class="v num" id="cv-fct"></span></figcaption><div class="chart" id="ch-fct" style="height:270px"></div></figure>
-      <figure class="card chart-card"><figcaption><span class="t">Niederschlag, nächste 48 Stunden</span><span class="v num" id="cv-fcp"></span></figcaption><div class="chart" id="ch-fcp"></div></figure>
-      <figure class="card chart-card"><figcaption><span class="t">Wind &amp; Böen, nächste 48 Stunden</span><span class="v num" id="cv-fcw"></span></figcaption><div class="chart" id="ch-fcw"></div></figure>
-    </div>
+
+    <figure class="card chart-card" id="mg-card" style="margin:14px 0 0">
+      <figcaption><span class="t" id="mg-title">Meteogramm</span><span class="seg" id="seg-mg" role="group" aria-label="Zeitraum"></span></figcaption>
+      <div class="legend-note" id="mg-legend"></div>
+      <div class="scroll-x"><div class="chart" id="ch-mg" style="height:640px;min-width:640px"></div></div>
+    </figure>
+
+    <div class="sub-head"><div><h3>Modellvergleich</h3><p>Wie unterschiedlich rechnen die Modelle? Jede dünne Linie ist ein Modell, ein Klick darauf wählt es aus.</p></div></div>
+    <figure class="card chart-card" id="cmp-card" style="margin:0"><div class="chart" id="ch-cmp" style="height:330px"></div></figure>
+    <figure class="card chart-card" id="mm-card" style="margin:14px 0 0">
+      <figcaption><span class="t">Modell-Matrix</span><span class="seg" id="seg-mm" role="group" aria-label="Messgröße"></span></figcaption>
+      <p class="note" id="mm-sub" style="margin:0 4px 10px"></p>
+      <div class="table-wrap" style="box-shadow:none"><table id="tbl-mm" class="mm"></table></div>
+    </figure>
+
+    <div class="sub-head" id="trend-head"><div><h3>14-Tage-Trend</h3><p id="trend-sub"></p></div></div>
+    <figure class="card chart-card" id="trend-card" style="margin:0"><div class="scroll-x"><div class="chart" id="ch-trend" style="height:360px;min-width:640px"></div></div></figure>
     <p class="note" id="fc-note"></p>
   </section>
 
@@ -583,14 +629,14 @@ const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const S = {
   info: null, rt: null, rtAt: 0, daily: new Map(), h5: [], h30: [], savedAt: 0,
-  mode: "live", range: "24h", recScope: "all", year: null, cal: "t", rose: "7d", outliers: true, forecast: null, fcDay: 0,
+  mode: "live", range: "24h", recScope: "all", year: null, cal: "t", rose: "7d", outliers: true, forecast: null, fcDay: 0, fcModel: null, mgRange: null, mmMetric: "tx",
   excluded: []
 };
 
 /* ---------------- Hilfsfunktionen ---------------- */
 const $ = id => document.getElementById(id);
 const isNum = v => typeof v === "number" && isFinite(v);
-const fmt = (v, d = 1) => isNum(v) ? v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d }).replace("-", "−") : "–";
+const fmt = (v, d = 1) => isNum(v) ? (Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d }).replace("-", "−") : "–";
 const fmtInt = v => isNum(v) ? Math.round(v).toLocaleString("de-DE").replace("-", "−") : "–";
 const fmtAx = (v, u = "") => (Number.isInteger(v) ? v.toLocaleString("de-DE") : v.toLocaleString("de-DE", { maximumFractionDigits: 1 })).replace("-", "−") + u;
 const sum = a => a.reduce((s, x) => s + x, 0);
@@ -1488,7 +1534,10 @@ const WW_LABEL = { fog: "Nebel", drizzle: "Sprühregen", rain_l: "Leichter Regen
 const RISK_LABEL = { thunderstorm: "Gewitter", freezing_rain: "Glatteis", snow: "Schnee", sleet: "Schneeregen", fog: "Nebel", wind: "Sturmböen", rain: "Regen", showers: "Schauer" };
 const SEC_LABEL = { night: "Nacht", morning: "Vormittag", midday: "Nachmittag", evening: "Abend" };
 const SEVERITY = { Minor: ["Wetterwarnung", "#f2c230"], Moderate: ["Markante Warnung", "#f2994a"], Severe: ["Unwetterwarnung", "#e5484d"], Extreme: ["Extremes Unwetter", "#9b51e0"] };
-/** ww-Code (WMO 4677, wie DWD-ICON) plus Bewölkung -> Symbol und Text */
+const FC_GROUPS = [["mix", "Mittel"], ["short", "Kurzfrist"], ["global", "Global"], ["ai", "KI-Modelle"], ["ens", "Ensembles"], ["stat", "Statistik"]];
+const MM_METRICS = { tx: ["Höchstwert", "tmax2m:c", "°C"], tn: ["Tiefstwert", "tmin2m:c", "°C"], rd: ["Niederschlag", "precip:mm", "mm"], wg: ["Böen", "windgust:kmh", "km/h"] };
+
+/** ww-Code (WMO 4677, wie DWD-ICON) plus Bewölkung -> [Symbol, Text] */
 function wwInfo(code, clct, isDay = true) {
   const c = isNum(code) ? code : null;
   const cloud = isNum(clct) ? clct : 50;
@@ -1510,6 +1559,15 @@ function wwInfo(code, clct, isDay = true) {
   if (c === 95) return ["thunder", WW_LABEL.thunder];
   if (c === 96 || c === 99) return ["thunder", WW_LABEL.thunder_hail];
   return sky();
+}
+/** Symbol ohne ww-Code (Mix): aus Niederschlagsrate, Temperatur und Bewölkung */
+function derivedKind(rate, temp, clct, isDay) {
+  if (isNum(rate) && rate >= 0.1) {
+    const snow = isNum(temp) && temp < 0.5;
+    if (snow) return ["snow", rate >= 1 ? WW_LABEL.snow : WW_LABEL.snow_l];
+    return rate >= 2.5 ? ["rain_h", WW_LABEL.rain_h] : rate >= 0.5 ? ["rain", WW_LABEL.rain] : ["drizzle", WW_LABEL.rain_l];
+  }
+  return wwInfo(null, clct, isDay);
 }
 function wxIcon(kind, isDay = true, cls = "wx") {
   const dark = isDark();
@@ -1539,8 +1597,9 @@ function wxIcon(kind, isDay = true, cls = "wx") {
     case "thunder": g = cloud(0, -5, 1, CLD) + `<path d="M26 30l-7 9h5.5l-3 8 9-11h-5.5l3-6z" fill="#f5c518"/>`; break;
     default: g = cloud(0, 0, 1, CL);
   }
-  return `<svg class="${cls}" viewBox="0 0 48 48" aria-hidden="true">${g}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="${cls}" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">${g}</svg>`;
 }
+const iconURI = (kind, isDay) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(wxIcon(kind, isDay, ""));
 const ICON_DROP = `<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z" fill="currentColor"/></svg>`;
 const ICON_SUN = `<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="currentColor"/></svg>`;
 const ICON_WARN = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>`;
@@ -1550,14 +1609,79 @@ function lightColor(hex) { const [r, g, b] = hex2rgb(hex); return (0.299 * r + 0
 function runLabel(run) { if (!run || run.length < 10) return run || ""; const ms = Date.UTC(+run.slice(0, 4), +run.slice(4, 6) - 1, +run.slice(6, 8), +run.slice(8, 10)); const p = parts(ms); return `${p.day}.${p.month}., ${p.hour}:${p.minute} Uhr`; }
 function isDayAt(ms) { const i = S.info || {}; if (!isNum(i.lat) || !isNum(i.lon)) { const h = +parts(ms).hour; return h >= 7 && h < 17; } const st = sunTimes(Date.parse(localDate(ms) + "T12:00:00Z"), i.lat, i.lon); return ms >= st.rise && ms <= st.set; }
 const fv = (o, k) => (o && isNum(o[k]) ? o[k] : null);
+const r1 = v => isNum(v) ? Math.round(v * 10) / 10 : null;
+const r2 = v => isNum(v) ? Math.round(v * 100) / 100 : null;
+function quantile(arr, q) { const a = arr.filter(isNum).sort((x, y) => x - y); if (!a.length) return null; const p = (a.length - 1) * q, lo = Math.floor(p), hi = Math.ceil(p); return a[lo] + (a[hi] - a[lo]) * (p - lo); }
+const COMPASS8 = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+const dir8 = d => isNum(d) ? COMPASS8[Math.round(d / 45) % 8] : "–";
+
+function fcModels() { return (S.forecast && S.forecast.models) || {}; }
+function fcHorizonH(m) { const t = m && m.hourly && m.hourly.t; return t && t.length ? (t[t.length - 1] - (S.rtAt || Date.now())) / 3600e3 : 0; }
+function horizonText(h) { return h < 72 ? `${Math.max(1, Math.round(h))} h` : `${Math.round(h / 24)} Tage`; }
+function selectModel(id) { S.fcModel = id; S.fcDay = 0; store.set("ws-fc-model", id); renderForecast(); }
+
+/** Stündliche Reihe des gewählten Modells; beim Mix der Median aller deterministischen Modelle mit ihrer Spanne */
+function fcSeries(id) {
+  const now = S.rtAt || Date.now();
+  const rateOf = (T, V) => T.map((t, i) => { const v = V ? V[i] : null; if (!isNum(v)) return null; const dt = i > 0 ? (t - T[i - 1]) / 3600e3 : (T.length > 1 ? (T[1] - T[0]) / 3600e3 : 1); return r2(v / Math.max(1, dt)); });
+  if (id !== "mix") {
+    const m = fcModels()[id]; if (!m || !m.hourly || !m.hourly.t || !m.hourly.t.length) return null;
+    const h = m.hourly, o = { t: h.t, ens: !!m.members, label: m.label };
+    for (const k of Object.keys(h)) if (k !== "t") o[k] = h[k];
+    o.rate = rateOf(h.t, h["precip:mm"]);
+    o.rateHi = h["precip_p90:mm"] ? rateOf(h.t, h["precip_p90:mm"]) : null;
+    o.lo = h["t2m_p10:c"] || null; o.hi = h["t2m_p90:c"] || null;
+    return o;
+  }
+  const ms = Object.values(fcModels()).filter(m => m && m.hourly && m.hourly.t && m.hourly.t.length && m.group !== "ens");
+  if (!ms.length) return null;
+  const start = Math.ceil((now - 3600e3) / 3600e3) * 3600e3;
+  const end = Math.min(Math.max(...ms.map(m => m.hourly.t[m.hourly.t.length - 1])), now + 10 * 864e5);
+  const grid = []; for (let t = start; t <= end; t += 3600e3) grid.push(t);
+  const idx = (T, t) => { let lo = 0, hi = T.length - 1; if (t < T[0] || t > T[hi]) return -1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (T[mid] <= t) lo = mid; else hi = mid; } return lo; };
+  const interp = (m, k, t) => { const T = m.hourly.t, V = m.hourly[k]; if (!V) return null; const i = idx(T, t); if (i < 0) return null; if (T[i] === t) return isNum(V[i]) ? V[i] : null; const j = i + 1; if (j >= T.length || !isNum(V[i]) || !isNum(V[j]) || T[j] - T[i] > 6 * 3600e3) return null; return V[i] + (V[j] - V[i]) * (t - T[i]) / (T[j] - T[i]); };
+  const rateAt = (m, t) => { const T = m.hourly.t, V = m.hourly["precip:mm"]; if (!V) return null; let j = -1; for (let k = 1; k < T.length; k++) if (T[k] >= t) { j = k; break; } if (j < 1) return null; const dt = (T[j] - T[j - 1]) / 3600e3; return dt <= 6 && isNum(V[j]) ? V[j] / Math.max(1, dt) : null; };
+  const o = { t: grid, ens: false, mix: true, label: "Mix", n: [] };
+  for (const k of ["t2m:c", "dp2m:c", "clct_eff:percent", "wind:kmh", "windgust:kmh", "pmsl:hpa", "cape:jkg"]) o[k] = [];
+  o.lo = []; o.hi = []; o.rate = []; o["winddir:deg"] = [];
+  for (const t of grid) {
+    const temps = ms.map(m => interp(m, "t2m:c", t)).filter(isNum);
+    o.n.push(temps.length);
+    for (const k of ["t2m:c", "dp2m:c", "clct_eff:percent", "wind:kmh", "windgust:kmh", "pmsl:hpa", "cape:jkg"]) o[k].push(r1(quantile(ms.map(m => interp(m, k, t)), .5)));
+    o.lo.push(r1(quantile(temps, temps.length >= 5 ? .1 : 0))); o.hi.push(r1(quantile(temps, temps.length >= 5 ? .9 : 1)));
+    o.rate.push(r2(quantile(ms.map(m => rateAt(m, t)), .5)));
+    let sx = 0, sy = 0, c = 0; for (const m of ms) { const V = m.hourly["winddir:deg"], T = m.hourly.t; if (!V) continue; const i = idx(T, t); if (i < 0 || !isNum(V[i]) || Math.abs(T[i] - t) > 3 * 3600e3) continue; sx += Math.sin(V[i] * Math.PI / 180); sy += Math.cos(V[i] * Math.PI / 180); c++; }
+    o["winddir:deg"].push(c ? (Math.atan2(sx, sy) * 180 / Math.PI + 360) % 360 : null);
+  }
+  return o;
+}
+function hourKind(sr, i) {
+  const t = sr.t[i], day = isDayAt(t);
+  if (sr["ww:code"] && isNum(sr["ww:code"][i])) return wwInfo(sr["ww:code"][i], sr["clct_eff:percent"] && sr["clct_eff:percent"][i], day);
+  return derivedKind(sr.rate && sr.rate[i], sr["t2m:c"] && sr["t2m:c"][i], sr["clct_eff:percent"] && sr["clct_eff:percent"][i], day);
+}
+function localTimes(x0, x1, hour) { const out = []; for (let t = Math.ceil(x0 / 3600e3) * 3600e3; t <= x1; t += 3600e3) if (+parts(t).hour === hour) out.push(t); return out; }
+function nightAreas(x0, x1) {
+  const i = S.info || {}; if (!isNum(i.lat)) return [];
+  const out = []; let d = addDays(localDate(x0), -1); const last = localDate(x1);
+  while (d <= last) { const a = sunTimes(Date.parse(d + "T12:00:00Z"), i.lat, i.lon).set, b = sunTimes(Date.parse(addDays(d, 1) + "T12:00:00Z"), i.lat, i.lon).rise; const s = Math.max(a, x0), e = Math.min(b, x1); if (e > s) out.push([{ xAxis: s }, { xAxis: e }]); d = addDays(d, 1); }
+  return out;
+}
 
 function renderForecast() {
   const f = S.forecast, sec = $("vorhersage");
-  const has = f && ((f.daily && f.daily.days && f.daily.days.length) || (f.hourly && f.hourly.t && f.hourly.t.length));
+  const models = fcModels();
+  const has = f && ((f.mix && f.mix.days && f.mix.days.length) || Object.keys(models).length);
   sec.hidden = !has; $("nav-fc").hidden = !has;
   if (!has) return;
+  if (!S.fcModel) S.fcModel = store.get("ws-fc-model") || "mix";
+  if (S.fcModel !== "mix" && !models[S.fcModel]) S.fcModel = "mix";
+  const sel = S.fcModel, m = models[sel];
+  const fns = [renderFcAlerts, renderFcPicker, renderFcDays, renderMeteogram, renderFcCompare, renderFcMatrix, renderFcTrend, renderFcNote];
+  for (const fn of fns) { try { fn(f, sel, m); } catch (e) { console.error(fn.name, e); } }
+}
 
-  // --- Warnungen und Gewitterzellen ---
+function renderFcAlerts(f) {
   const warns = (f.warnings && f.warnings.items) || [], cells = (f.stormcells && f.stormcells.cells) || [];
   let ah = "";
   if (cells.length) {
@@ -1577,109 +1701,278 @@ function renderForecast() {
   }
   $("fc-alerts").innerHTML = ah;
   const st = $("fc-state");
+  st.hidden = !(f.warnings || f.stormcells);
   if (warns.length || cells.length) { st.style.setProperty("--c", "var(--crit)"); st.innerHTML = `<i></i>${warns.length + cells.length} ${warns.length + cells.length === 1 ? "Warnung" : "Warnungen"} aktiv`; }
-  else if (f.warnings || f.stormcells) { st.style.setProperty("--c", "var(--good)"); st.innerHTML = `<i></i>Keine Warnungen`; }
-  else st.hidden = true;
+  else { st.style.setProperty("--c", "var(--good)"); st.innerHTML = `<i></i>Keine Warnungen`; }
+}
 
-  // --- Tageskarten ---
-  const days = (f.daily && f.daily.days) || [];
-  if (S.fcDay >= days.length) S.fcDay = 0;
+function renderFcPicker(f, sel, m) {
+  const models = fcModels();
+  const mix = f.mix || {};
+  let h = "";
+  for (const [g, gl] of FC_GROUPS) {
+    let pills = "";
+    if (g === "mix") { if (mix.days) pills = `<button class="mp" data-m="mix" aria-pressed="${sel === "mix"}">meteoCORE Mix<small>${mix.models ? mix.models + " Modelle" : "Mittel"}</small></button>`; }
+    else for (const [id, x] of Object.entries(models)) if (x && x.group === g) pills += `<button class="mp" data-m="${id}" aria-pressed="${sel === id}" title="${esc(x.name || x.label)}">${esc(x.label)}<small>${horizonText(fcHorizonH(x))}</small></button>`;
+    if (pills) h += `<div class="mp-row"><span class="gl">${gl}</span><div class="mp-chips">${pills}</div></div>`;
+  }
+  $("fc-picker").innerHTML = h;
+  let info;
+  if (sel === "mix") info = `<b>meteoCORE Mix</b><span>Gewichtetes Mittel aus ${mix.models || "vielen"} Wettermodellen${mix.members ? ` mit ${fmtInt(mix.members)} Modellläufen` : ""}. Tageswerte von meteoCORE, das Meteogramm zeigt den Median der Einzelmodelle mit ihrer Spanne.</span>`;
+  else info = `<b>${esc(m.name || m.label)}</b><span>${esc(m.desc || "")}</span><span class="muted">Lauf ${runLabel(m.run)}${m.members ? ` · ${m.members} Mitglieder` : ""} · Reichweite ${horizonText(fcHorizonH(m))}</span>`;
+  $("fc-minfo").innerHTML = info;
+}
+
+function renderFcDays(f, sel, m) {
+  const days = sel === "mix" ? ((f.mix && f.mix.days) || []) : ((m && m.daily) || []);
+  const shown = days.slice(0, 10);
+  if (S.fcDay >= shown.length) S.fcDay = 0;
   const today = localDate(Date.now()), tomorrow = addDays(today, 1);
-  const los = days.map(d => fv(d, "tmin2m_p10:c") ?? fv(d, "tmin2m:c")).filter(isNum), his = days.map(d => fv(d, "tmax2m_p90:c") ?? fv(d, "tmax2m:c")).filter(isNum);
-  const lo = Math.floor(Math.min(...los, 0) - 1), hi = Math.ceil(Math.max(...his, 5) + 1), pos = v => clamp((v - lo) / (hi - lo) * 100, 0, 100);
-  $("fc-days").innerHTML = days.map((d, i) => {
+  const lo0 = shown.map(d => fv(d, "tmin2m_p10:c") ?? fv(d, "tmin2m:c")).filter(isNum), hi0 = shown.map(d => fv(d, "tmax2m_p90:c") ?? fv(d, "tmax2m:c")).filter(isNum);
+  const lo = Math.floor(Math.min(...lo0, 0) - 1), hi = Math.ceil(Math.max(...hi0, 5) + 1), pos = v => clamp((v - lo) / (hi - lo) * 100, 0, 100);
+  const el = $("fc-days");
+  el.style.gridTemplateColumns = shown.length > 7 ? `repeat(${shown.length}, minmax(128px, 1fr))` : `repeat(7, minmax(0, 1fr))`;
+  el.innerHTML = shown.map((d, i) => {
     const [kind, label] = wwInfo(fv(d, "ww:code"), fv(d, "clct_eff:percent"), true);
     const wdLong = new Date(d.date + "T12:00:00Z").toLocaleDateString("de-DE", { weekday: "long", timeZone: "UTC" });
     const name = d.date === today ? "Heute" : d.date === tomorrow ? "Morgen" : wdLong;
     const short = d.date === today || d.date === tomorrow ? name : wday(d.date).replace(".", "");
     const tx = fv(d, "tmax2m:c"), tn = fv(d, "tmin2m:c");
-    const ux = fv(d, "tmax2m_p90:c") ?? tx, un = fv(d, "tmin2m_p10:c") ?? tn;
+    const ux = fv(d, "tmax2m_p90:c"), un = fv(d, "tmin2m_p10:c");
     const pr = fv(d, "precip:mm"), pp = fv(d, "precip_prob_0_1mm:percent"), sn = fv(d, "snowfall:mm"), sun = fv(d, "sunshine:min"), gust = fv(d, "windgust:kmh");
+    const partial = d.date !== today && isNum(d.coverage) && d.coverage < .9;
     const risks = (d.risks || []).filter(r => RISK_LABEL[r.type] && !["rain", "showers"].includes(r.type) && (!isNum(r["probability:percent"]) || r["probability:percent"] >= 20));
     const precipTxt = isNum(sn) && sn >= 0.5 ? `${fmt(sn)} cm Schnee` : `${fmt(pr)} mm`;
+    const band = isNum(ux) && isNum(un) ? `<span class="unc" style="left:${pos(un)}%;width:${Math.max(1, pos(ux) - pos(un))}%"></span>` : "";
     return `<button class="fc-day" data-i="${i}" aria-pressed="${i === S.fcDay}" title="Tagesabschnitte für ${name} anzeigen">
-      <span class="dn-wrap"><span class="dn"><span class="long">${name}</span><span class="short">${short}</span></span><span class="dd">${fmtDs(d.date)}</span></span>
+      <span class="dn-wrap"><span class="dn"><span class="long">${name}</span><span class="short">${short}</span></span><span class="dd">${fmtDs(d.date)}${partial ? " · teilweise" : ""}</span></span>
       ${wxIcon(kind, true)}
       <span class="dc">${label}</span>
       <span class="dt-wrap"><span class="dt num">${fmt(tx, 0)}°<span class="lo">${fmt(tn, 0)}°</span></span>
-        <span class="trange" title="Spanne der Modelle: ${fmt(un)} bis ${fmt(ux)} °C"><span class="unc" style="left:${pos(un)}%;width:${Math.max(1, pos(ux) - pos(un))}%"></span><span class="rng" style="left:${pos(tn)}%;width:${Math.max(2, pos(tx) - pos(tn))}%;background:linear-gradient(90deg, ${heat(tn)}, ${heat(tx)})"></span></span></span>
+        <span class="trange"${band ? ` title="Spanne: ${fmt(un)} bis ${fmt(ux)} °C"` : ""}>${band}<span class="rng" style="left:${pos(tn)}%;width:${Math.max(2, pos(tx) - pos(tn))}%;background:linear-gradient(90deg, ${heat(tn)}, ${heat(tx)})"></span></span></span>
       <span class="dm"><span style="color:var(--s1)">${ICON_DROP}<span style="color:var(--fg-2)">${precipTxt}${isNum(pp) ? ` · ${fmtInt(pp)} %` : ""}</span></span>
         <span class="sunw"><span style="color:#f5b638">${ICON_SUN}</span>${isNum(sun) ? `${fmt(sun / 60, 1)} h` : "–"}${isNum(gust) ? ` · Böen ${fmtInt(gust)}` : ""}</span></span>
       <span class="risk-wrap">${risks.map(r => `<span class="chip" style="--c:${r.type === "thunderstorm" || r.type === "wind" ? "var(--crit)" : r.type === "fog" ? "var(--muted)" : "var(--s1)"}">${RISK_LABEL[r.type]}${isNum(r["probability:percent"]) ? ` ${fmtInt(r["probability:percent"])} %` : ""}</span>`).join("")}</span>
     </button>`;
-  }).join("");
-
-  // --- Tagesabschnitte des gewählten Tages ---
-  const sd = days[S.fcDay];
-  const secs = (sd && sd.sections) || [];
+  }).join("") || `<p class="muted">Für dieses Modell gibt es keine Tageswerte.</p>`;
+  const sd = shown[S.fcDay], secs = (sd && sd.sections) || [];
   $("fc-sections").hidden = !secs.length;
   $("fc-sections").innerHTML = secs.map(x => {
     const [kind, label] = wwInfo(fv(x, "ww:code"), fv(x, "clct_eff:percent"), x.is_day !== false);
-    const p = fv(x, "precip_prob_0_1mm:percent");
+    const p = fv(x, "precip_prob_0_1mm:percent"), pr = fv(x, "precip:mm");
     return `<div class="fc-sec">${wxIcon(kind, x.is_day !== false)}<span class="sn">${SEC_LABEL[x.name] || x.name}</span>
       <span class="sv num">${fmt(fv(x, "tmax2m:c"), 0)}° <span class="muted" style="font-weight:500">${fmt(fv(x, "tmin2m:c"), 0)}°</span></span>
-      <span class="ss">${label}${isNum(p) ? ` · Regen ${fmtInt(p)} %` : ""}</span></div>`;
+      <span class="ss">${label}${isNum(p) ? ` · Regen ${fmtInt(p)} %` : isNum(pr) && pr >= 0.1 ? ` · ${fmt(pr)} mm` : ""}</span></div>`;
   }).join("");
+  $("fc-sub").textContent = sel === "mix" ? "Wähle oben ein einzelnes Wettermodell oder bleib beim Mittel aus allen Modellen. Ein Klick auf einen Tag zeigt seine Abschnitte." : `Ansicht für ${(m && m.label) || sel}. Ein Klick auf einen Tag zeigt seine Abschnitte.`;
+}
 
-  const fd = f.daily || {}, fh = f.hourly || {};
-  $("fc-sub").textContent = days.length ? `${days.length} Tage aus ${fd.models || "mehreren"} Wettermodellen, gewichtet zu einer gemeinsamen Vorhersage. Die graue Spanne zeigt, wie weit die Modelle auseinanderliegen.` : "Stündliche Vorhersage für die nächsten 48 Stunden.";
-
-  // --- Diagramme: 24 h gemessen + 48 h Vorhersage ---
+function renderMeteogram(f, sel, m) {
+  const sr = fcSeries(sel);
+  const card = $("mg-card"); card.hidden = !sr; if (!sr || !window.echarts) return;
   const now = S.rtAt || Date.now();
-  const H = (fh.t || []).map((t, i) => ({ t, i })).filter(o => o.t >= now - 3600e3);
-  const hv = k => H.map(o => [o.t, isNum((fh[k] || [])[o.i]) ? fh[k][o.i] : null]);
-  if (H.length && window.echarts) {
-    const meas = S.h5.filter(p => isNum(p.t) && p.ts >= now - 24 * 3600e3).map(p => [p.ts, p.t]);
-    const fcT = hv("t2m:c");
-    const t0 = meas.length ? meas[0][0] : H[0].t, t1 = H[H.length - 1].t;
-    const xAx = ax({ type: "time", min: t0, max: t1, splitLine: { show: false }, axisLabel: { color: tok("--muted"), fontSize: 11, hideOverlap: true, formatter: { day: "{dd}.{MM}.", hour: "{HH}:{mm}" } } });
-    const nowLine = { silent: true, symbol: "none", lineStyle: { color: tok("--fg-2"), width: 1, type: "solid" }, label: { formatter: "jetzt", color: tok("--fg-2"), fontSize: 11, position: "insideEndTop" }, data: [{ xAxis: now }] };
-    const fcVals = fcT.map(x => x[1]).filter(isNum);
-    $("cv-fct").textContent = fcVals.length ? `nächste 48 h: ${fmt(minOf(fcVals))} bis ${fmt(maxOf(fcVals))} °C` : "";
-    const wwAt = ms => { let best = null; for (const o of H) if (Math.abs(o.t - ms) < 1800e3) best = o; return best ? wwInfo((fh["ww:code"] || [])[best.i], (fh["clct_eff:percent"] || [])[best.i], isDayAt(ms))[1] : null; };
-    chart("ch-fct").setOption(base({
-      grid: { left: 40, right: 16, top: 36, bottom: 28 },
-      legend: { show: true, top: 0, right: 8, itemWidth: 16, itemHeight: 8, textStyle: { color: tok("--fg-2"), fontSize: 12 }, data: ["Gemessen", "Vorhersage"] },
-      tooltip: { ...base().tooltip, formatter: ps => { if (!ps.length) return ""; const ms = ps[0].value[0]; const w = ms > now ? wwAt(ms) : null; return `<b>${tipTime(ms)}</b>` + ps.filter(p => isNum(p.value[1])).map(p => `<br>${dot(heat(p.value[1]))}${p.seriesName}: <b>${fmt(p.value[1])}</b> °C`).join("") + (w ? `<br><span style="color:${tok("--muted")}">${w}</span>` : ""); } },
-      xAxis: xAx, yAxis: ax({ type: "value", scale: true, axisLabel: { color: tok("--muted"), fontSize: 11, formatter: v => fmtAx(v, "°") } }),
-      visualMap: { show: false, type: "continuous", seriesIndex: [0, 1], dimension: 1, min: -20, max: 40, inRange: { color: HEAT.map(s => s[1]) } },
-      series: [
-        { name: "Gemessen", type: "line", data: meas, showSymbol: false, lineStyle: { width: 2.5 }, itemStyle: { color: heat(meas.length ? meas[meas.length - 1][1] : 10) }, emphasis: { disabled: true }, markLine: nowLine },
-        { name: "Vorhersage", type: "line", data: fcT, showSymbol: false, connectNulls: true, lineStyle: { width: 2.5, type: [6, 4] }, itemStyle: { color: heat(fcVals.length ? fcVals[0] : 10) }, emphasis: { disabled: true } }
-      ]
-    }), true);
-    const P = hv("precip:mm").filter(x => x[0] >= now - 1800e3);
-    $("cv-fcp").textContent = `Summe ${fmt(sum(P.map(x => x[1]).filter(isNum)))} mm`;
-    chart("ch-fcp").setOption(base({
-      grid: { left: 56, right: 16, top: 18, bottom: 28 },
-      tooltip: { ...base().tooltip, formatter: ps => `<b>${tipTime(ps[0].value[0])}</b><br>${dot(tok("--s1"))}Niederschlag: <b>${fmt(ps[0].value[1])}</b> mm/h` + (wwAt(ps[0].value[0]) ? `<br><span style="color:${tok("--muted")}">${wwAt(ps[0].value[0])}</span>` : "") },
-      xAxis: { ...xAx, min: now - 1800e3 }, yAxis: ax({ type: "value", min: 0, max: v => Math.max(1, Math.ceil(v.max)), axisLabel: { color: tok("--muted"), fontSize: 11, formatter: v => fmtAx(v, " mm") } }),
-      series: [{ name: "Niederschlag", type: "bar", data: P, barMaxWidth: 8, itemStyle: { color: tok("--s1"), borderRadius: [3, 3, 0, 0] } }]
-    }), true);
-    const W = hv("wind:kmh").filter(x => x[0] >= now - 1800e3), G = hv("windgust:kmh").filter(x => x[0] >= now - 1800e3);
-    const gv = G.map(x => x[1]).filter(isNum);
-    $("cv-fcw").textContent = gv.length ? `max. Böe ${fmtInt(maxOf(gv))} km/h` : "";
-    chart("ch-fcw").setOption(base({
-      grid: { left: 46, right: 16, top: 30, bottom: 28 },
-      legend: { show: true, top: 0, right: 8, itemWidth: 14, itemHeight: 8, textStyle: { color: tok("--fg-2"), fontSize: 12 }, data: ["Wind", "Böen"] },
-      tooltip: { ...base().tooltip, formatter: ps => `<b>${tipTime(ps[0].value[0])}</b>` + ps.filter(p => isNum(p.value[1])).map(p => `<br>${dot(p.color)}${p.seriesName}: <b>${fmtInt(p.value[1])}</b> km/h`).join("") },
-      xAxis: { ...xAx, min: now - 1800e3 }, yAxis: ax({ type: "value", min: 0 }),
-      series: [
-        { name: "Wind", type: "line", data: W, showSymbol: false, connectNulls: true, lineStyle: { width: 2, color: tok("--s7") }, itemStyle: { color: tok("--s7") }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: tok("--s7") + "55" }, { offset: 1, color: tok("--s7") + "05" }]) } },
-        { name: "Böen", type: "line", data: G, showSymbol: false, connectNulls: true, lineStyle: { width: 1.5, color: tok("--s5") }, itemStyle: { color: tok("--s5") } }
-      ]
-    }), true);
+  const maxH = (sr.t[sr.t.length - 1] - now) / 3600e3;
+  const ranges = [[48, "2 Tage"], [120, "5 Tage"], [240, "10 Tage"]].filter(([h], i) => i === 0 || maxH > [48, 120, 240][i - 1] + 6);
+  if (!S.mgRange || !ranges.some(r => r[0] === S.mgRange)) S.mgRange = ranges.find(r => r[0] === 120) ? 120 : ranges[ranges.length - 1][0];
+  $("seg-mg").innerHTML = ranges.map(([h, l]) => `<button data-v="${h}" aria-pressed="${S.mgRange === h}">${l}</button>`).join("");
+  const x0 = now - 12 * 3600e3, x1 = Math.min(now + S.mgRange * 3600e3, sr.t[sr.t.length - 1]);
+  const I = sr.t.map((t, i) => i).filter(i => sr.t[i] >= now - 1800e3 && sr.t[i] <= x1);
+  const P = k => I.map(i => [sr.t[i], sr[k] ? sr[k][i] : null]);
+  const step = S.mgRange <= 48 ? 3 : S.mgRange <= 120 ? 6 : 12;
+  const dedupe = []; let lastT = -Infinity;
+  for (const i of I) { if (+parts(sr.t[i]).hour % step === 0 && sr.t[i] - lastT >= step * 3600e3 * .9) { dedupe.push(i); lastT = sr.t[i]; } }
+  const tickEvery = S.mgRange <= 48 ? 6 : 12, bottomTicks = []; for (let t = Math.ceil(x0 / 3600e3) * 3600e3; t <= x1; t += 3600e3) if (+parts(t).hour % tickEvery === 0) bottomTicks.push(t);
+  const mids = localTimes(x0, x1, 0), noons = localTimes(x0, x1, 12), nights = nightAreas(x0, x1);
+  const dark = isDark(), nightCol = dark ? "rgba(0,0,0,.22)" : "rgba(40,60,110,.07)";
+  const deco = (withNow) => ({
+    markArea: { silent: true, itemStyle: { color: nightCol }, data: nights },
+    markLine: { silent: true, symbol: "none", animation: false, lineStyle: { color: tok("--line-2"), width: 1, type: "solid" }, label: { show: false },
+      data: mids.map(t => ({ xAxis: t })).concat(withNow ? [{ xAxis: now, lineStyle: { color: tok("--fg-2"), width: 1.2 }, label: { show: true, formatter: "jetzt", position: "insideEndTop", color: tok("--fg-2"), fontSize: 11 } }] : [{ xAxis: now, lineStyle: { color: tok("--fg-2"), width: 1.2 } }]) }
+  });
+  const L = 48, R = 14, GT = [52, 302, 418, 540], GH = [214, 84, 92, 64];
+  const grids = GT.map((top, i) => ({ left: L, right: R, top, height: GH[i] }));
+  const fmtDayLbl = v => { const p = parts(v); return `${wday(`${p.year}-${p.month}-${p.day}`)} ${+p.day}.${+p.month}.`; };
+  const xAxes = grids.map((_, i) => ({
+    type: "time", gridIndex: i, min: x0, max: x1, position: i === 0 ? "top" : "bottom",
+    axisLine: { show: i === 3, lineStyle: { color: tok("--line-2") } }, axisTick: { show: false }, splitLine: { show: false },
+    axisPointer: { label: { show: false } },
+    axisLabel: i === 0 ? { show: true, customValues: noons, formatter: fmtDayLbl, color: tok("--fg-2"), fontSize: 12, fontWeight: 600 }
+      : i === 3 ? { show: true, customValues: bottomTicks, formatter: v => parts(v).hour + " Uhr", color: tok("--muted"), fontSize: 10, hideOverlap: true } : { show: false }
+  }));
+  const temps = P("t2m:c").map(x => x[1]).concat(sr.lo ? I.map(i => sr.lo[i]) : [], sr.hi ? I.map(i => sr.hi[i]) : []).filter(isNum);
+  const meas = S.h5.filter(p => isNum(p.t) && p.ts >= x0 && p.ts <= now).map(p => [p.ts, p.t]);
+  const allT = temps.concat(meas.map(x => x[1]));
+  const tMin = Math.floor(Math.min(...allT) - 1), tMaxData = Math.ceil(Math.max(...allT) + 1), tMax = tMaxData + Math.max(3, Math.round((tMaxData - tMin) * .35));
+  const yAxes = [
+    ax({ type: "value", gridIndex: 0, min: tMin, max: tMax, splitNumber: 4, axisLabel: { color: tok("--muted"), fontSize: 10, formatter: v => v > tMaxData ? "" : fmtAx(v, "°") } }),
+    ax({ type: "value", gridIndex: 1, min: 0, max: v => Math.max(1, Math.ceil(v.max * 1.15)), splitNumber: 2, axisLabel: { color: tok("--muted"), fontSize: 10, formatter: v => fmtAx(v) } }),
+    ax({ type: "value", gridIndex: 2, min: 0, max: v => Math.max(20, Math.ceil(v.max / 10) * 10 + 10), splitNumber: 2, axisLabel: { color: tok("--muted"), fontSize: 10 } }),
+    ax({ type: "value", gridIndex: 3, scale: true, splitNumber: 2, axisLabel: { color: tok("--muted"), fontSize: 10 } })
+  ];
+  const series = [];
+  const bandCol = dark ? "rgba(170,190,225,.18)" : "rgba(70,95,140,.16)";
+  if (sr.lo && sr.hi) {
+    series.push({ name: "_lo", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: I.map(i => [sr.t[i], sr.lo[i]]), stack: "tb", stackStrategy: "all", lineStyle: { opacity: 0 }, showSymbol: false, silent: true, z: 1 });
+    series.push({ name: "_band", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: I.map(i => [sr.t[i], isNum(sr.hi[i]) && isNum(sr.lo[i]) ? r1(sr.hi[i] - sr.lo[i]) : null]), stack: "tb", stackStrategy: "all", lineStyle: { opacity: 0 }, areaStyle: { color: bandCol }, showSymbol: false, silent: true, z: 1 });
   }
+  series.push({ name: "Gemessen", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: meas, showSymbol: false, lineStyle: { width: 1.6, color: tok("--muted") }, itemStyle: { color: tok("--muted") }, z: 3 });
+  const tempIdx = series.length;
+  series.push({ name: "Temperatur", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: P("t2m:c"), showSymbol: false, connectNulls: true, lineStyle: { width: 2.6 }, z: 4, ...deco(true) });
+  series.push({ name: "Taupunkt", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: P("dp2m:c"), showSymbol: false, connectNulls: true, lineStyle: { width: 1.2, color: tok("--s3") }, itemStyle: { color: tok("--s3") }, z: 3 });
+  series.push({ name: "_icons", type: "custom", xAxisIndex: 0, yAxisIndex: 0, silent: true, z: 6, data: dedupe.map(i => [sr.t[i], tMax, i]),
+    renderItem: (params, api) => { const i = api.value(2), pt = api.coord([api.value(0), tMax]); const [kind] = hourKind(sr, i); const s = 26; return { type: "image", style: { image: iconURI(kind, isDayAt(sr.t[i])), x: pt[0] - s / 2, y: params.coordSys.y + 4, width: s, height: s } }; } });
+  series.push({ name: "Niederschlag", type: "bar", xAxisIndex: 1, yAxisIndex: 1, data: I.map(i => [sr.t[i], sr.rate[i]]), barMaxWidth: S.mgRange <= 48 ? 7 : 4, itemStyle: { color: tok("--s1"), borderRadius: [2, 2, 0, 0] }, ...deco(false) });
+  if (sr.rateHi) series.push({ name: "Niederschlag 90 %", type: "line", step: "middle", xAxisIndex: 1, yAxisIndex: 1, data: I.map(i => [sr.t[i], sr.rateHi[i]]), showSymbol: false, lineStyle: { width: 1, color: tok("--s1"), opacity: .55 }, itemStyle: { color: tok("--s1") } });
+  series.push({ name: "Wind", type: "line", xAxisIndex: 2, yAxisIndex: 2, data: P("wind:kmh"), showSymbol: false, connectNulls: true, lineStyle: { width: 1.8, color: tok("--s7") }, itemStyle: { color: tok("--s7") }, areaStyle: { color: tok("--s7") + "33" }, ...deco(false) });
+  series.push({ name: "Böen", type: "line", xAxisIndex: 2, yAxisIndex: 2, data: P("windgust:kmh"), showSymbol: false, connectNulls: true, lineStyle: { width: 1.3, color: tok("--s5") }, itemStyle: { color: tok("--s5") } });
+  series.push({ name: "_arrows", type: "custom", xAxisIndex: 2, yAxisIndex: 2, silent: true, z: 6, data: dedupe.filter(i => sr["winddir:deg"] && isNum(sr["winddir:deg"][i])).map(i => [sr.t[i], 0, sr["winddir:deg"][i]]),
+    renderItem: (params, api) => { const pt = api.coord([api.value(0), 0]); const dir = api.value(2); return { type: "path", x: pt[0], y: params.coordSys.y + 9, rotation: -((dir + 180) % 360) * Math.PI / 180, shape: { pathData: "M0,-7L4.5,5L0,2.5L-4.5,5Z" }, style: { fill: tok("--fg-2") } }; } });
+  series.push({ name: "Luftdruck", type: "line", xAxisIndex: 3, yAxisIndex: 3, data: P("pmsl:hpa"), showSymbol: false, connectNulls: true, lineStyle: { width: 1.8, color: tok("--s6") }, itemStyle: { color: tok("--s6") }, ...deco(false) });
+  const titles = ["Temperatur und Taupunkt (°C)", "Niederschlag (mm/h)", "Wind und Böen (km/h)", "Luftdruck (hPa)"];
+  const graphic = titles.map((t, i) => ({ type: "text", left: L, top: GT[i] - (i === 0 ? 46 : 18), style: { text: i === 0 ? "" : t, fill: tok("--fg-2"), font: "600 12px Barlow, system-ui, sans-serif" } }));
+  const near = ms => { let best = -1, bd = Infinity; for (const i of I) { const d = Math.abs(sr.t[i] - ms); if (d < bd) { bd = d; best = i; } } return bd <= 3 * 3600e3 ? best : -1; };
+  const tip = ps => {
+    const ms = ps[0].axisValue; if (ms <= now - 1800e3) { const mv = meas.reduce((b, x) => Math.abs(x[0] - ms) < Math.abs(b[0] - ms) ? x : b, meas[0] || [0, null]); return `<b>${tipTime(ms)}</b><br>${dot(tok("--muted"))}Gemessen: <b>${fmt(mv[1])}</b> °C`; }
+    const i = near(ms); if (i < 0) return "";
+    const g = k => sr[k] ? sr[k][i] : null, [, lbl] = hourKind(sr, i);
+    let s = `<b>${tipTime(sr.t[i])}</b> · ${lbl}<br>${dot(heat(g("t2m:c")))}Temperatur <b>${fmt(g("t2m:c"))} °C</b>`;
+    if (sr.lo && isNum(sr.lo[i]) && isNum(sr.hi[i])) s += ` <span style="color:${tok("--muted")}">(${fmt(sr.lo[i])} bis ${fmt(sr.hi[i])})</span>`;
+    if (isNum(g("dp2m:c"))) s += `<br>${dot(tok("--s3"))}Taupunkt ${fmt(g("dp2m:c"))} °C`;
+    s += `<br>${dot(tok("--s1"))}Niederschlag <b>${fmt(sr.rate[i], 1)} mm/h</b>` + (isNum(g("clct_eff:percent")) ? ` · Wolken ${fmtInt(g("clct_eff:percent"))} %` : "");
+    s += `<br>${dot(tok("--s7"))}Wind ${fmtInt(g("wind:kmh"))} km/h aus ${dir8(g("winddir:deg"))}` + (isNum(g("windgust:kmh")) ? ` · Böen <b>${fmtInt(g("windgust:kmh"))}</b>` : "");
+    if (isNum(g("pmsl:hpa"))) s += `<br>${dot(tok("--s6"))}Luftdruck ${fmt(g("pmsl:hpa"))} hPa`;
+    if (isNum(g("cape:jkg")) && g("cape:jkg") >= 100) s += `<br><span style="color:${tok("--muted")}">Gewitterenergie (CAPE) ${fmtInt(g("cape:jkg"))} J/kg</span>`;
+    if (sr.mix && sr.n[i]) s += `<br><span style="color:${tok("--muted")}">Median aus ${sr.n[i]} Modellen</span>`;
+    return s;
+  };
+  chart("ch-mg").setOption(base({
+    grid: grids, xAxis: xAxes, yAxis: yAxes, series, graphic,
+    axisPointer: { link: [{ xAxisIndex: "all" }] },
+    tooltip: { ...base().tooltip, formatter: tip },
+    visualMap: { show: false, type: "continuous", seriesIndex: tempIdx, dimension: 1, min: -20, max: 40, inRange: { color: HEAT.map(s => s[1]) } }
+  }), true);
+  const lg = [[`linear-gradient(90deg, ${heat(0)}, ${heat(15)}, ${heat(30)})`, sr.mix ? "Temperatur (Median)" : "Temperatur"], [tok("--muted"), "Gemessen"], [tok("--s3"), "Taupunkt"]];
+  if (sr.lo) lg.push([bandCol, sr.mix ? "Spanne der Modelle (80 %)" : "Spanne des Ensembles (80 %)"]);
+  lg.push([tok("--s1"), "Niederschlag"], [tok("--s7"), "Wind"], [tok("--s5"), "Böen"], [tok("--s6"), "Luftdruck"], [nightCol, "Nacht"]);
+  $("mg-legend").innerHTML = lg.map(([c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join("") + `<span class="muted">Pfeile: Windrichtung</span>`;
+  $("mg-title").textContent = sr.mix ? "Meteogramm: Median aller Modelle" : `Meteogramm: ${m.label}`;
+}
 
-  // --- Quellenangabe ---
-  const src = [];
-  src.push(`Vorhersage: <a href="https://meteocore.com/" target="_blank" rel="noopener">meteoCORE</a>${fd.models ? `, gewichtet aus ${fd.models} Wettermodellen${fd.members ? ` mit ${fmtInt(fd.members)} Modellmitgliedern` : ""}` : ""}.`);
-  if (fh.model) src.push(`Stundenwerte: ${esc(fh.model)}${fh.run ? `, Lauf ${runLabel(fh.run)}` : ""}${fh.attribution ? `, ${esc(fh.attribution)}` : ""}${fh.licence ? ` (${esc(fh.licence)})` : ""}.`);
+function renderFcCompare(f, sel) {
+  const models = fcModels(); const card = $("cmp-card");
+  const det = Object.entries(models).filter(([, x]) => x && x.hourly && x.group !== "ens");
+  card.hidden = det.length < 2; if (det.length < 2 || !window.echarts) return;
+  const now = S.rtAt || Date.now(), x0 = now - 3 * 3600e3, x1 = now + 7 * 864e5;
+  const ser = []; const muted = isDark() ? "rgba(180,195,220,.38)" : "rgba(80,95,125,.35)";
+  const ens = models["ecmwf-ens"];
+  if (ens && ens.hourly && ens.hourly["t2m_p10:c"]) {
+    const T = ens.hourly.t, keep = T.map((t, i) => i).filter(i => T[i] >= x0 && T[i] <= x1);
+    ser.push({ id: "_elo", name: "_elo", type: "line", data: keep.map(i => [T[i], ens.hourly["t2m_p10:c"][i]]), stack: "eb", stackStrategy: "all", lineStyle: { opacity: 0 }, showSymbol: false, silent: true });
+    ser.push({ id: "_eband", name: "ECMWF-ENS (80 % der Läufe)", type: "line", data: keep.map(i => [T[i], r1(ens.hourly["t2m_p90:c"][i] - ens.hourly["t2m_p10:c"][i])]), stack: "eb", stackStrategy: "all", lineStyle: { opacity: 0 }, areaStyle: { color: isDark() ? "rgba(108,198,255,.16)" : "rgba(10,111,184,.12)" }, itemStyle: { color: isDark() ? "rgba(108,198,255,.5)" : "rgba(10,111,184,.45)" }, showSymbol: false, silent: true });
+  }
+  for (const [id, x] of det) {
+    const T = x.hourly.t, V = x.hourly["t2m:c"] || [];
+    const isSel = id === sel;
+    ser.push({ id, name: isSel ? x.label : "Einzelmodelle", type: "line", data: T.map((t, i) => [t, V[i]]).filter(p => p[0] >= x0 && p[0] <= x1), showSymbol: false, connectNulls: true, z: isSel ? 5 : 2,
+      lineStyle: { width: isSel ? 2.8 : 1.1, color: isSel ? tok("--accent") : muted }, itemStyle: { color: isSel ? tok("--accent") : muted }, emphasis: { focus: "series", lineStyle: { width: 2.4 } } });
+  }
+  const mixSr = fcSeries("mix");
+  if (mixSr) ser.push({ id: "_median", name: "Median aller Modelle", type: "line", data: mixSr.t.map((t, i) => [t, mixSr["t2m:c"][i]]).filter(p => p[0] <= x1), showSymbol: false, z: 4, lineStyle: { width: 2, type: [6, 4], color: tok("--fg") }, itemStyle: { color: tok("--fg") } });
+  ser[0] && (ser[0].markLine = { silent: true, symbol: "none", lineStyle: { color: tok("--fg-2"), width: 1, type: "solid" }, label: { formatter: "jetzt", color: tok("--fg-2"), fontSize: 11, position: "insideEndTop" }, data: [{ xAxis: now }] });
+  const legendData = ["Einzelmodelle"].concat(sel !== "mix" && models[sel] && models[sel].group !== "ens" ? [models[sel].label] : [], mixSr ? ["Median aller Modelle"] : [], ens && ens.hourly && ens.hourly["t2m_p10:c"] ? ["ECMWF-ENS (80 % der Läufe)"] : []);
+  const c = chart("ch-cmp");
+  const narrow = $("ch-cmp").clientWidth < 600;
+  c.setOption(base({
+    grid: { left: 40, right: 16, top: narrow ? 64 : 40, bottom: 28 },
+    legend: { show: true, top: 0, left: 0, itemWidth: 16, itemHeight: 8, textStyle: { color: tok("--fg-2"), fontSize: 12 }, data: legendData },
+    tooltip: { ...base().tooltip, formatter: ps => {
+      const ms = ps[0].axisValue; const rows = [];
+      for (const [id, x] of det) { const T = x.hourly.t, V = x.hourly["t2m:c"] || []; let bi = -1, bd = Infinity; for (let i = 0; i < T.length; i++) { const d = Math.abs(T[i] - ms); if (d < bd) { bd = d; bi = i; } } if (bi >= 0 && bd <= 1.6 * 3600e3 && isNum(V[bi])) rows.push([x.label, V[bi], id === sel]); }
+      rows.sort((a, b) => b[1] - a[1]);
+      return `<b>${tipTime(ms)}</b><br>` + rows.map(r => `${dot(heat(r[1]))}${r[2] ? "<b>" : ""}${esc(r[0])}: ${fmt(r[1])} °C${r[2] ? "</b>" : ""}`).join("<br>");
+    } },
+    xAxis: ax({ type: "time", min: x0, max: x1, splitLine: { show: false }, axisLabel: { color: tok("--muted"), fontSize: 11, hideOverlap: true, formatter: { day: "{dd}.{MM}.", hour: "{HH}:{mm}" } } }),
+    yAxis: ax({ type: "value", scale: true, axisLabel: { color: tok("--muted"), fontSize: 11, formatter: v => fmtAx(v, "°") } }),
+    series: ser
+  }), true);
+  c.off("click"); c.on("click", p => { if (p.seriesId && models[p.seriesId]) selectModel(p.seriesId); });
+}
+
+function renderFcMatrix(f, sel) {
+  const models = fcModels();
+  const [mLabel, key, unit] = MM_METRICS[S.mmMetric] || MM_METRICS.tx;
+  $("seg-mm").innerHTML = Object.entries(MM_METRICS).map(([k, v]) => `<button data-v="${k}" aria-pressed="${S.mmMetric === k}">${v[0]}</button>`).join("");
+  const today = localDate(Date.now()); const dates = []; for (let i = 1; i <= 7; i++) dates.push(addDays(today, i));
+  const rows = [];
+  if (f.mix && f.mix.days) rows.push(["mix", "meteoCORE Mix", "Mittel", f.mix.days]);
+  for (const [g, gl] of FC_GROUPS) for (const [id, x] of Object.entries(models)) if (x && x.group === g && x.daily && x.daily.length) rows.push([id, x.label, gl, x.daily]);
+  if (!rows.length) { $("mm-card").hidden = true; return; }
+  $("mm-card").hidden = false;
+  const tint = v => { if (!isNum(v)) return ""; if (key.startsWith("t")) return `--tc:${heat(v)}`; if (key.startsWith("precip")) return `--tc:color-mix(in srgb, var(--s1) ${Math.round(clamp(v / 15, .06, 1) * 100)}%, transparent)`; return `--tc:color-mix(in srgb, var(--s7) ${Math.round(clamp((v - 10) / 70, .05, 1) * 100)}%, transparent)`; };
+  const colVals = dates.map(() => []);
+  let h = `<thead><tr><th>Modell</th>${dates.map(d => `<th style="text-align:center">${d === addDays(today, 1) ? "Morgen" : wday(d)}<small>${fmtDs(d)}</small></th>`).join("")}</tr></thead><tbody>`;
+  for (const [id, label, gl, days] of rows) {
+    const byDate = new Map(days.map(d => [d.date, d]));
+    h += `<tr class="${id === sel ? "sel" : ""}"><td><button class="mrow" data-m="${id}">${esc(label)}<small>${gl}</small></button></td>`;
+    dates.forEach((d, j) => {
+      const x = byDate.get(d), v = x ? fv(x, key) : null, part = x && isNum(x.coverage) && x.coverage < .9;
+      if (isNum(v) && id !== "mix" && !part) colVals[j].push(v);
+      h += isNum(v) ? `<td class="tint mmv${part ? " part" : ""}" style="${tint(v)}" title="${part ? "Tag nur teilweise abgedeckt" : ""}">${fmt(v, key.startsWith("wind") ? 0 : key.startsWith("precip") ? 1 : 0)}${part ? "*" : ""}</td>` : `<td class="mmv muted">–</td>`;
+    });
+    h += `</tr>`;
+  }
+  h += `<tr class="agree"><td><span class="mrow" style="cursor:default">Einigkeit<small>Spanne der Modelle</small></span></td>${colVals.map(a => { if (a.length < 2) return `<td class="mmv muted">–</td>`; const sp = Math.max(...a) - Math.min(...a); const lvl = key.startsWith("t") ? (sp <= 2 ? 0 : sp <= 5 ? 1 : 2) : key.startsWith("precip") ? (sp <= 2 ? 0 : sp <= 8 ? 1 : 2) : (sp <= 15 ? 0 : sp <= 30 ? 1 : 2); const col = ["var(--good)", "var(--warn)", "var(--crit)"][lvl]; return `<td class="mmv"><span class="chip" style="--c:${col}">${fmt(sp, key.startsWith("precip") ? 1 : 0)} ${unit}</span></td>`; }).join("")}</tr>`;
+  $("tbl-mm").innerHTML = h + "</tbody>";
+  $("mm-sub").textContent = `${mLabel} je Modell und Tag in ${unit}. Die letzte Zeile zeigt, wie weit die Modelle auseinanderliegen: grün heißt einig, rot heißt unsicher. Ein Stern markiert Tage, die das Modell nur teilweise abdeckt.`;
+}
+
+function renderFcTrend(f) {
+  const tr = f.trend, card = $("trend-card");
+  card.hidden = !(tr && tr.days && tr.days.length); if (card.hidden || !window.echarts) return;
+  const days = tr.days, cats = days.map(d => d.date);
+  const lbl = d => `${wday(d)} ${+d.slice(8, 10)}.${+d.slice(5, 7)}.`;
+  const G = k => days.map(d => fv(d, k));
+  const warm = tok("--s2"), cool = tok("--s1"), dark = isDark();
+  const band = (lo, hi, col, id) => [
+    { name: "_" + id + "lo", type: "line", data: lo, stack: id, stackStrategy: "all", lineStyle: { opacity: 0 }, showSymbol: false, silent: true, xAxisIndex: 0, yAxisIndex: 0 },
+    { name: "_" + id, type: "line", data: hi.map((v, i) => isNum(v) && isNum(lo[i]) ? r1(v - lo[i]) : null), stack: id, stackStrategy: "all", lineStyle: { opacity: 0 }, areaStyle: { color: col }, showSymbol: false, silent: true, xAxisIndex: 0, yAxisIndex: 0 }
+  ];
+  const tx = G("tmax2m:c"), tn = G("tmin2m:c");
+  const allT = tx.concat(tn, G("tmax2m_p90:c"), G("tmin2m_p10:c")).filter(isNum);
+  const yMin = Math.floor((Math.min(...allT) - 1) / 5) * 5, yTop = Math.ceil((Math.max(...allT) + 1) / 5) * 5, yMax = yTop + 5 * Math.max(1, Math.round((yTop - yMin) * .4 / 5));
+  chart("ch-trend").setOption(base({
+    grid: [{ left: 44, right: 14, top: 30, height: 200 }, { left: 44, right: 14, top: 268, height: 70 }],
+    xAxis: [ax({ type: "category", gridIndex: 0, data: cats, position: "top", boundaryGap: true, splitLine: { show: false }, axisLabel: { color: tok("--fg-2"), fontSize: 11, fontWeight: 600, interval: 0, formatter: v => lbl(v).split(" ")[0] } }),
+            ax({ type: "category", gridIndex: 1, data: cats, boundaryGap: true, splitLine: { show: false }, axisLabel: { color: tok("--muted"), fontSize: 10, interval: 0, formatter: v => `${+v.slice(8, 10)}.${+v.slice(5, 7)}.` } })],
+    yAxis: [ax({ type: "value", gridIndex: 0, min: yMin, max: yMax, interval: 5, axisLabel: { color: tok("--muted"), fontSize: 10, formatter: v => v > yTop ? "" : fmtAx(v, "°") } }),
+            ax({ type: "value", gridIndex: 1, min: 0, max: v => Math.max(2, Math.ceil(v.max * 1.2)), splitNumber: 2, axisLabel: { color: tok("--muted"), fontSize: 10, formatter: v => fmtAx(v) } })],
+    tooltip: { ...base().tooltip, formatter: ps => { const i = ps[0].dataIndex, d = days[i]; const [, l] = wwInfo(fv(d, "ww:code"), fv(d, "clct_eff:percent"), true);
+      return `<b>${lbl(d.date)}</b> · ${l}<br>${dot(warm)}Höchstwert <b>${fmt(fv(d, "tmax2m:c"))} °C</b> <span style="color:${tok("--muted")}">(${fmt(fv(d, "tmax2m_p10:c"))} bis ${fmt(fv(d, "tmax2m_p90:c"))})</span><br>${dot(cool)}Tiefstwert <b>${fmt(fv(d, "tmin2m:c"))} °C</b> <span style="color:${tok("--muted")}">(${fmt(fv(d, "tmin2m_p10:c"))} bis ${fmt(fv(d, "tmin2m_p90:c"))})</span><br>${dot(tok("--s1"))}Niederschlag ${fmt(fv(d, "precip:mm"))} mm · Wahrscheinlichkeit ≥ 1 mm: ${fmtInt(fv(d, "precip_prob_1mm:percent"))} %` + (isNum(fv(d, "sunshine:min")) ? `<br>Sonne ${fmt(fv(d, "sunshine:min") / 60, 1)} h` : "") + (isNum(d["systems:count"]) ? `<br><span style="color:${tok("--muted")}">aus ${d["systems:count"]} Modellen</span>` : ""); } },
+    series: [
+      ...band(G("tmax2m_p10:c"), G("tmax2m_p90:c"), warm + (dark ? "38" : "2e"), "bx"),
+      ...band(G("tmin2m_p10:c"), G("tmin2m_p90:c"), cool + (dark ? "38" : "2e"), "bn"),
+      { name: "Höchstwert", type: "line", data: tx, symbol: "circle", symbolSize: 6, lineStyle: { width: 2.4, color: warm }, itemStyle: { color: warm, borderColor: tok("--surface"), borderWidth: 1.5 }, label: { show: true, position: "top", color: tok("--fg"), fontSize: 10, formatter: p => fmt(p.value, 0) + "°" }, xAxisIndex: 0, yAxisIndex: 0, z: 4 },
+      { name: "Tiefstwert", type: "line", data: tn, symbol: "circle", symbolSize: 6, lineStyle: { width: 2.4, color: cool }, itemStyle: { color: cool, borderColor: tok("--surface"), borderWidth: 1.5 }, label: { show: true, position: "bottom", color: tok("--fg-2"), fontSize: 10, formatter: p => fmt(p.value, 0) + "°" }, xAxisIndex: 0, yAxisIndex: 0, z: 4 },
+      { name: "_icons", type: "custom", silent: true, xAxisIndex: 0, yAxisIndex: 0, z: 6, data: days.map((d, i) => [i, yMax]),
+        renderItem: (params, api) => { const i = api.value(0), pt = api.coord([i, yMax]), d = days[i]; const [kind] = wwInfo(fv(d, "ww:code"), fv(d, "clct_eff:percent"), true); const s = 26; return { type: "image", style: { image: iconURI(kind, true), x: pt[0] - s / 2, y: params.coordSys.y + 4, width: s, height: s } }; } },
+      { name: "Niederschlag", type: "bar", data: G("precip:mm"), xAxisIndex: 1, yAxisIndex: 1, barMaxWidth: 16, itemStyle: { color: tok("--s1"), borderRadius: [3, 3, 0, 0] },
+        label: { show: true, position: "top", color: tok("--muted"), fontSize: 9, formatter: p => { const v = fv(days[p.dataIndex], "precip_prob_1mm:percent"); return isNum(v) && v >= 10 ? fmtInt(v) + " %" : ""; } } }
+    ]
+  }), true);
+  $("trend-sub").textContent = `Die nächsten ${days.length} Tage aus ${tr.models || "allen"} Modellen. Linien zeigen den Median, Flächen die Spanne, in der 80 % der Modellläufe liegen. Über den Regenbalken: Wahrscheinlichkeit für mindestens 1 mm.`;
+}
+
+function renderFcNote(f, sel, m) {
+  const mix = f.mix || {}, src = [];
+  src.push(`Vorhersagen: <a href="https://meteocore.com/" target="_blank" rel="noopener">meteoCORE</a>.`);
+  if (sel !== "mix" && m) src.push(`${esc(m.name || m.label)}: ${esc(m.attribution || "")}${m.licence ? ` (${esc(m.licence)})` : ""}, Lauf ${runLabel(m.run)}.`);
   if (f.warnings) src.push(`Warnungen: Deutscher Wetterdienst.`);
   if (f.fetchedAt) src.push(`Abgerufen ${new Date(f.fetchedAt).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: TZ() })} Uhr.`);
   if (f.errors && f.errors.length) src.push(`Gerade nicht verfügbar: ${esc(f.errors.join(", "))}.`);
-  const attr = (fd.attributions || []).concat(fd.elevation_attribution ? [fd.elevation_attribution] : []);
-  $("fc-note").innerHTML = src.join(" ") + (attr.length ? ` <details style="margin-top:6px"><summary style="cursor:pointer;color:var(--accent)">Alle Datenquellen (${attr.length})</summary><ul style="margin:6px 0 0;padding-left:18px">${attr.map(a => `<li>${esc(a)}</li>`).join("")}</ul></details>` : "");
+  const attr = new Set(mix.attributions || []);
+  for (const x of Object.values(fcModels())) if (x && x.attribution) attr.add(`${x.name || x.label}: ${x.attribution}${x.licence ? ` (${x.licence})` : ""}`);
+  if (mix.elevation_attribution) attr.add(mix.elevation_attribution);
+  $("fc-note").innerHTML = src.join(" ") + (attr.size ? ` <details style="margin-top:6px"><summary style="cursor:pointer;color:var(--accent)">Alle Datenquellen (${attr.size})</summary><ul style="margin:6px 0 0;padding-left:18px">${[...attr].map(a => `<li>${esc(a)}</li>`).join("")}</ul></details>` : "");
 }
 
 /* ---------------- Footer ---------------- */
@@ -1750,6 +2043,10 @@ function openSettings() {
 function initUI() {
   bindSeg("seg-range", v => { S.range = v; renderHistory(); });
   $("fc-days").addEventListener("click", e => { const b = e.target.closest(".fc-day"); if (!b) return; S.fcDay = +b.dataset.i; renderForecast(); });
+  $("fc-picker").addEventListener("click", e => { const b = e.target.closest(".mp"); if (b) selectModel(b.dataset.m); });
+  $("tbl-mm").addEventListener("click", e => { const b = e.target.closest("button.mrow"); if (b) selectModel(b.dataset.m); });
+  bindSeg("seg-mg", v => { S.mgRange = +v; renderForecast(); });
+  bindSeg("seg-mm", v => { S.mmMetric = v; renderForecast(); });
   bindSeg("seg-rec", v => { S.recScope = v; renderRecords(); });
   bindSeg("seg-year", v => { S.year = +v; renderYear(); });
   bindSeg("seg-cal", v => { S.cal = v; renderCalendar(); });

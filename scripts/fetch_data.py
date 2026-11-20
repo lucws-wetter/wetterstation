@@ -117,75 +117,170 @@ def parse_hist(data, daily):
 # keine Ortsnamen, damit der Standort über die öffentlichen Daten nicht ablesbar ist.
 # ---------------------------------------------------------------------------
 MC_API = "https://api.meteocore.com"
+# Modelle, die die Seite zur Auswahl anbietet. every = Minuten, nach denen frisch abgefragt wird
+# (orientiert an den Laufzeiten der Modelle); dazwischen wird der letzte Stand weiterverwendet.
+MODELS = [
+    {"id": "icon-d2-ruc", "label": "ICON-D2-RUC", "group": "short", "every": 60, "desc": "DWD, 2,2 km. Wird jede Stunde neu gerechnet und ist damit das aktuellste Modell für die nächsten Stunden."},
+    {"id": "icon-d2", "label": "ICON-D2", "group": "short", "every": 150, "desc": "DWD, 2,2 km. Hochauflösendes Regionalmodell, bildet Schauer, Gewitter und Starkregen besonders direkt ab."},
+    {"id": "arome", "label": "AROME", "group": "short", "every": 150, "desc": "Météo-France, 1,3 km. Feinmaschiges französisches Regionalmodell mit eigener Physik, gut als Gegenprobe zu ICON-D2."},
+    {"id": "icon-ch2", "label": "ICON-CH2", "group": "short", "every": 300, "desc": "MeteoSchweiz, 2,1 km. Hochauflösend bis 5 Tage, stündliche Werte."},
+    {"id": "ecmwf", "label": "ECMWF", "group": "global", "every": 360, "desc": "Europäisches Zentrum für mittelfristige Vorhersage (IFS HRES). Gilt als bestes Globalmodell, bis 15 Tage."},
+    {"id": "icon-global", "label": "ICON", "group": "global", "every": 360, "desc": "DWD, globales Modell mit 13 km Gitter, bis 7,5 Tage."},
+    {"id": "icon-eu", "label": "ICON-EU", "group": "global", "every": 180, "desc": "DWD, Europa-Ausschnitt mit 6,5 km, stündlich bis 5 Tage."},
+    {"id": "gfs", "label": "GFS", "group": "global", "every": 360, "desc": "US-Wetterdienst NOAA. Globales Modell bis 16 Tage."},
+    {"id": "ukmo-global", "label": "UKMO", "group": "global", "every": 360, "desc": "Britischer Wetterdienst (Met Office), globales Modell mit 10 km, bis 7 Tage."},
+    {"id": "gem-gdps", "label": "GEM", "group": "global", "every": 720, "desc": "Kanadischer Wetterdienst, globales Modell bis 10 Tage."},
+    {"id": "aifs-single", "label": "AIFS", "group": "ai", "every": 360, "desc": "ECMWF-Modell auf Basis künstlicher Intelligenz, lernt aus jahrzehntelangen Wetterdaten, bis 15 Tage."},
+    {"id": "aicon", "label": "AICON", "group": "ai", "every": 360, "desc": "KI-Modell des DWD, gelernt aus der ICON-Reanalyse, bis 5 Tage."},
+    {"id": "icon-d2-eps", "label": "ICON-D2-EPS", "group": "ens", "every": 180, "desc": "DWD-Ensemble aus 20 leicht veränderten Läufen. Linie = Median, Fläche = Spanne der mittleren 80 %."},
+    {"id": "ecmwf-ens", "label": "ECMWF-ENS", "group": "ens", "every": 360, "desc": "ECMWF-Ensemble mit 51 Läufen. Zeigt, wie sicher die nächsten Tage sind."},
+    {"id": "gefs", "label": "GEFS", "group": "ens", "every": 360, "desc": "NOAA-Ensemble mit 31 Läufen, bis 16 Tage."},
+    {"id": "mosmix-l", "label": "MOSMIX", "group": "stat", "every": 360, "desc": "DWD-Stationsprognose: Modelldaten statistisch mit Messungen am nächstgelegenen DWD-Messort korrigiert."},
+]
+HORIZON_H = 14 * 24
+TS_PARAMS = "t2m:c,dp2m:c,precip:mm,clct_eff:percent,wind:kmh,windgust:kmh,winddir:deg,ww:code,pmsl:hpa,sunshine:min,cape:jkg"
+HOUR_KEYS = ["t2m:c", "dp2m:c", "precip:mm", "clct_eff:percent", "wind:kmh", "windgust:kmh", "winddir:deg", "ww:code",
+             "pmsl:hpa", "sunshine:min", "cape:jkg",
+             "t2m_p10:c", "t2m_p90:c", "precip_p10:mm", "precip_p90:mm", "windgust_p10:kmh", "windgust_p90:kmh"]
 DAY_KEYS = ["date", "coverage", "systems:count", "ww:code", "clct_eff:percent", "is_day",
             "tmax2m:c", "tmax2m_p10:c", "tmax2m_p90:c", "tmin2m:c", "tmin2m_p10:c", "tmin2m_p90:c",
-            "precip:mm", "precip_p10:mm", "precip_p90:mm", "precip_prob_0_1mm:percent", "precip_prob_1mm:percent",
+            "precip:mm", "precip_p10:mm", "precip_p90:mm", "precip_max_1h:mm", "precip_prob_0_1mm:percent", "precip_prob_1mm:percent",
             "precip_prob_10mm:percent", "precip_type", "precip_level:count", "snowfall:mm",
-            "sunshine:min", "wind:kmh", "wind:bft", "windgust:kmh", "windgust_p90:kmh", "risks"]
+            "sunshine:min", "sunshine_p10:min", "sunshine_p90:min", "wind:kmh", "wind:bft", "winddir:deg",
+            "windgust:kmh", "windgust_p10:kmh", "windgust_p90:kmh", "risks"]
 SECTION_KEYS = ["name", "start", "end", "is_day", "ww:code", "clct_eff:percent", "tmax2m:c", "tmin2m:c",
                 "precip:mm", "precip_prob_0_1mm:percent", "precip_prob_1mm:percent", "snowfall:mm",
                 "sunshine:min", "wind:kmh", "windgust:kmh", "risks"]
-HOUR_KEYS = ["t2m:c", "dp2m:c", "precip:mm", "wind:kmh", "windgust:kmh", "winddir:deg", "clct_eff:percent",
-             "ww:code", "pmsl:hpa", "relhum2m:percent", "sunshine:min"]
 WARN_KEYS = ["identifier", "event", "headline", "description", "instruction", "severity", "urgency", "certainty",
              "onset", "valid_from", "expires", "meteocore_group", "meteocore_event", "web"]
 
 
-def meteocore_forecast(lat, lon, tz_name):
+def rnd(v, nd=1):
+    return round(v, nd) if isinstance(v, float) else v
+
+
+def pick(d, keys):
+    return {k: d[k] for k in keys if isinstance(d, dict) and k in d}
+
+
+def trim_days(days, limit=14):
+    out = []
+    for d in (days or [])[:limit]:
+        x = {k: rnd(v) for k, v in pick(d, DAY_KEYS).items()}
+        x["sections"] = [{k: rnd(v) for k, v in pick(s, SECTION_KEYS).items()} for s in d.get("sections") or []]
+        out.append(x)
+    return out
+
+
+def load_previous():
+    """Letzten veröffentlichten Stand laden, damit nicht jedes Modell bei jedem Lauf neu abgefragt wird."""
+    local = ROOT / "site" / "data.json"
+    try:
+        if local.exists():
+            return json.loads(local.read_text())
+        url = os.environ.get("PREVIOUS_DATA_URL", "").strip()
+        if url:
+            with urllib.request.urlopen(url + "?t=" + str(int(time.time())), timeout=20) as r:
+                return json.load(r)
+    except Exception as e:
+        print(f"Vorheriger Stand nicht lesbar ({type(e).__name__}), alles wird neu geholt")
+    return {}
+
+
+def meteocore_forecast(lat, lon, tz_name, prev):
     cid = os.environ.get("METEOCORE_CLIENT_ID", "").strip()
     sec = os.environ.get("METEOCORE_CLIENT_SECRET", "").strip()
     if not (cid and sec):
         print("meteoCORE: keine Zugangsdaten gesetzt, Vorhersage übersprungen")
         return None
-    out = {"fetchedAt": int(time.time() * 1000), "errors": []}
+    now_ms = int(time.time() * 1000)
+    old = (prev or {}).get("forecast") or {}
+    out = {"fetchedAt": now_ms, "errors": [], "models": {}, "groups": {"short": "Kurzfrist", "global": "Global", "ai": "KI-Modelle", "ens": "Ensembles", "stat": "Statistik"}}
     try:
         body = urllib.parse.urlencode({"grant_type": "client_credentials", "client_id": cid, "client_secret": sec}).encode()
-        req = urllib.request.Request(MC_API + "/auth/token", data=body, method="POST",
-                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
+        req = urllib.request.Request(MC_API + "/auth/token", data=body, method="POST", headers={"Content-Type": "application/x-www-form-urlencoded"})
         with urllib.request.urlopen(req, timeout=30) as r:
             token = json.load(r)["access_token"]
     except Exception as e:
-        code = getattr(e, "code", type(e).__name__)
-        out["errors"].append(f"Anmeldung bei meteoCORE fehlgeschlagen ({code})")
+        out["errors"].append(f"Anmeldung bei meteoCORE fehlgeschlagen ({getattr(e, 'code', type(e).__name__)})")
+        for k in ("mix", "trend", "models"):  # alten Stand behalten
+            if old.get(k):
+                out[k] = old[k]
         return out
+    calls = 0
 
     def get(path, **q):
+        nonlocal calls
+        calls += 1
         url = MC_API + path + "?" + urllib.parse.urlencode(q)
         req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.load(r)
 
-    def pick(d, keys):
-        return {k: d[k] for k in keys if isinstance(d, dict) and k in d}
+    def due(block, minutes):
+        return not block or now_ms - (block.get("fetchedAt") or 0) > minutes * 60e3
 
-    # 7 Tage aus allen Modellen
-    try:
-        wd = get("/api/v1/weather/daily", lat=lat, lon=lon, days=7, tz=tz_name)
-        info = wd.get("info", {})
-        srcs = info.get("sources") or []
-        out["daily"] = {
-            "days": [{**pick(d, DAY_KEYS), "sections": [pick(s, SECTION_KEYS) for s in d.get("sections") or []]} for d in wd.get("days", [])],
-            "models": len(srcs),
-            "members": (info.get("data_points") or {}).get("members"),
-            "attributions": sorted({s.get("attribution") for s in srcs if s.get("attribution")}),
-            "licences": sorted({s.get("licence") for s in srcs if s.get("licence")}),
-            "elevation_attribution": info.get("elevation_attribution"),
-        }
-    except Exception as e:
-        out["errors"].append(f"Tagesvorhersage nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
+    # meteoCORE-Mix: 7 Tage aus allen Modellen (stündlich frisch), 14-Tage-Trend (alle 3 Stunden)
+    mix_old, trend_old = old.get("mix"), old.get("trend")
+    if due(mix_old, 55):
+        try:
+            wd = get("/api/v1/weather/daily", lat=lat, lon=lon, days=7, tz=tz_name)
+            info = wd.get("info", {}); srcs = info.get("sources") or []
+            out["mix"] = {"fetchedAt": now_ms, "days": trim_days(wd.get("days"), 7), "models": len(srcs),
+                          "members": (info.get("data_points") or {}).get("members"),
+                          "attributions": sorted({s.get("attribution") for s in srcs if s.get("attribution")}),
+                          "elevation_attribution": info.get("elevation_attribution")}
+        except Exception as e:
+            out["errors"].append(f"Mix nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
+            if mix_old: out["mix"] = mix_old
+    else:
+        out["mix"] = mix_old
+    if due(trend_old, 175):
+        try:
+            tr = get("/api/v1/weather/trend", lat=lat, lon=lon, days=14, tz=tz_name)
+            out["trend"] = {"fetchedAt": now_ms, "days": [{k: rnd(v) for k, v in pick(d, DAY_KEYS).items()} for d in tr.get("days", [])],
+                            "models": len((tr.get("info") or {}).get("sources") or [])}
+        except Exception as e:
+            out["errors"].append(f"14-Tage-Trend nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
+            if trend_old: out["trend"] = trend_old
+    else:
+        out["trend"] = trend_old
 
-    # 48 Stunden stündlich aus ICON-D2
-    try:
-        ts = get("/api/v1/forecast/icon-d2/timeseries/latest", lat=lat, lon=lon)
-        fc, info = ts.get("forecast") or {}, ts.get("info") or {}
-        times = [int(datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp() * 1000) for t in fc.get("valid_time", [])]
-        out["hourly"] = {"t": times, **{k: fc[k] for k in HOUR_KEYS if k in fc},
-                         "model": info.get("display_name") or "ICON-D2", "run": info.get("run"),
-                         "attribution": info.get("attribution"), "licence": info.get("licence")}
-    except Exception as e:
-        out["errors"].append(f"Stundenvorhersage nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
+    # Einzelmodelle: Stundenreihe + Tagesprodukt
+    old_models = old.get("models") or {}
+    horizon_ms = now_ms + HORIZON_H * 3600e3
+    for m in MODELS:
+        mid, prev_m = m["id"], old_models.get(m["id"])
+        if not due(prev_m, m["every"] - 5):
+            out["models"][mid] = prev_m
+            continue
+        try:
+            ts = get(f"/api/v1/forecast/{mid}/timeseries/latest", lat=lat, lon=lon, params=TS_PARAMS)
+            fc, info = ts.get("forecast") or {}, ts.get("info") or {}
+            times = [int(datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp() * 1000) for t in fc.get("valid_time", [])]
+            keep = [i for i, t in enumerate(times) if now_ms - 3 * 3600e3 <= t <= horizon_ms]
+            hourly = {"t": [times[i] for i in keep]}
+            for k in HOUR_KEYS:
+                if k in fc and isinstance(fc[k], list):
+                    nd = 2 if k.startswith("precip") else 1
+                    hourly[k] = [rnd(fc[k][i], nd) if i < len(fc[k]) else None for i in keep]
+            daily = []
+            try:
+                dd = get(f"/api/v1/forecast/{mid}/daily/latest", lat=lat, lon=lon, tz=tz_name)
+                daily = trim_days(dd.get("days"), 14)
+            except Exception as e:
+                out["errors"].append(f"{m['label']}: Tageswerte fehlen ({getattr(e, 'code', type(e).__name__)})")
+            ens = info.get("ensemble") or {}
+            out["models"][mid] = {"fetchedAt": now_ms, "label": m["label"], "group": m["group"], "desc": m["desc"],
+                                  "name": info.get("display_name") or m["label"], "run": info.get("run"),
+                                  "attribution": info.get("attribution"), "licence": info.get("licence"),
+                                  "members": ens.get("members"), "hourly": hourly, "daily": daily}
+        except Exception as e:
+            out["errors"].append(f"{m['label']} nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
+            if prev_m and now_ms - (prev_m.get("fetchedAt") or 0) < 24 * 3600e3:
+                out["models"][mid] = prev_m
 
-    # Amtliche Warnungen am Standort
+    # Amtliche Warnungen und Gewitterzellen: bei jedem Lauf
     try:
         w = get("/api/v1/warnings/point", lat=lat, lon=lon)
         items = []
@@ -198,21 +293,18 @@ def meteocore_forecast(lat, lon, tz_name):
         out["warnings"] = {"count": len(items), "max_severity": w.get("max_severity") or "", "items": items}
     except Exception as e:
         out["errors"].append(f"Warnungen nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
-
-    # Gewitterzellen, die den Standort in den nächsten 60 Minuten treffen
     try:
         sc = get("/api/v1/stormcells/point", lat=lat, lon=lon, lead=60)
-        cells = []
-        for c in sc.get("cells") or []:
-            # nur einfache Kennwerte, keine Positionen
-            cells.append({k: v for k, v in c.items() if isinstance(v, (int, float, str, bool)) and k not in ("lat", "lon", "latitude", "longitude", "x", "y")})
+        cells = [{k: v for k, v in c.items() if isinstance(v, (int, float, str, bool)) and k not in ("lat", "lon", "latitude", "longitude", "x", "y")}
+                 for c in sc.get("cells") or []]
         out["stormcells"] = {"count": len(cells), "cells": cells, "reference_time": sc.get("reference_time")}
     except Exception as e:
         out["errors"].append(f"Gewitterzellen nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
 
-    print(f"meteoCORE: {len((out.get('daily') or {}).get('days', []))} Tage, {len((out.get('hourly') or {}).get('t', []))} Stunden, "
+    fresh = sum(1 for v in out["models"].values() if v and v.get("fetchedAt") == now_ms)
+    print(f"meteoCORE: {calls} Abfragen, {len(out['models'])} Modelle ({fresh} neu geholt), "
           f"{(out.get('warnings') or {}).get('count', '?')} Warnungen, {(out.get('stormcells') or {}).get('count', '?')} Gewitterzellen"
-          + (f", Fehler: {out['errors']}" if out["errors"] else ""))
+          + (f", Hinweise: {out['errors']}" if out["errors"] else ""))
     return out
 
 
@@ -265,7 +357,7 @@ def main():
     # Vorhersage mit der genauen Position abfragen; die Position selbst wird nicht gespeichert
     forecast = None
     try:
-        forecast = meteocore_forecast(float(info_raw.get("latitude")), float(info_raw.get("longitude")), info["tz"])
+        forecast = meteocore_forecast(float(info_raw.get("latitude")), float(info_raw.get("longitude")), info["tz"], load_previous())
     except Exception as e:  # die Wetterseite soll auch ohne Vorhersage gebaut werden
         print(f"meteoCORE: unerwarteter Fehler ({type(e).__name__}), Vorhersage übersprungen")
 

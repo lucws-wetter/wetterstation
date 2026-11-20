@@ -30,6 +30,8 @@ jobs:
           ECOWITT_MAC: ${{ secrets.ECOWITT_MAC }}
           METEOCORE_CLIENT_ID: ${{ secrets.METEOCORE_CLIENT_ID }}
           METEOCORE_CLIENT_SECRET: ${{ secrets.METEOCORE_CLIENT_SECRET }}
+          # letzter veröffentlichter Stand: Modelle werden nur nach ihrem Takt neu abgefragt
+          PREVIOUS_DATA_URL: https://lucws-wetter.github.io/wetterstation/data.json
         run: python3 scripts/fetch_data.py
 
       - name: Seite bauen
