@@ -3,6 +3,7 @@
 
 Schlüssel kommen aus den Umgebungsvariablen ECOWITT_APPLICATION_KEY, ECOWITT_API_KEY
 und ECOWITT_MAC (auf GitHub als Secrets), lokal ersatzweise aus config.local.json.
+Optional: METEOCORE_CLIENT_ID und METEOCORE_CLIENT_SECRET für Vorhersage und Warnungen.
 
 Schreibt:
   data/daily.json  Tageswerte seit Messbeginn (wird im Repository versioniert)
@@ -109,6 +110,112 @@ def parse_hist(data, daily):
     return out
 
 
+# ---------------------------------------------------------------------------
+# meteoCORE: Vorhersage, Warnungen, Gewitterzellen (optional)
+# OAuth2 Client Credentials, Token gilt 5 Minuten -> bei jedem Lauf frisch holen.
+# Aus den Antworten werden nur ausgewählte Felder übernommen: keine Koordinaten,
+# keine Ortsnamen, damit der Standort über die öffentlichen Daten nicht ablesbar ist.
+# ---------------------------------------------------------------------------
+MC_API = "https://api.meteocore.com"
+DAY_KEYS = ["date", "coverage", "systems:count", "ww:code", "clct_eff:percent", "is_day",
+            "tmax2m:c", "tmax2m_p10:c", "tmax2m_p90:c", "tmin2m:c", "tmin2m_p10:c", "tmin2m_p90:c",
+            "precip:mm", "precip_p10:mm", "precip_p90:mm", "precip_prob_0_1mm:percent", "precip_prob_1mm:percent",
+            "precip_prob_10mm:percent", "precip_type", "precip_level:count", "snowfall:mm",
+            "sunshine:min", "wind:kmh", "wind:bft", "windgust:kmh", "windgust_p90:kmh", "risks"]
+SECTION_KEYS = ["name", "start", "end", "is_day", "ww:code", "clct_eff:percent", "tmax2m:c", "tmin2m:c",
+                "precip:mm", "precip_prob_0_1mm:percent", "precip_prob_1mm:percent", "snowfall:mm",
+                "sunshine:min", "wind:kmh", "windgust:kmh", "risks"]
+HOUR_KEYS = ["t2m:c", "dp2m:c", "precip:mm", "wind:kmh", "windgust:kmh", "winddir:deg", "clct_eff:percent",
+             "ww:code", "pmsl:hpa", "relhum2m:percent", "sunshine:min"]
+WARN_KEYS = ["identifier", "event", "headline", "description", "instruction", "severity", "urgency", "certainty",
+             "onset", "valid_from", "expires", "meteocore_group", "meteocore_event", "web"]
+
+
+def meteocore_forecast(lat, lon, tz_name):
+    cid = os.environ.get("METEOCORE_CLIENT_ID", "").strip()
+    sec = os.environ.get("METEOCORE_CLIENT_SECRET", "").strip()
+    if not (cid and sec):
+        print("meteoCORE: keine Zugangsdaten gesetzt, Vorhersage übersprungen")
+        return None
+    out = {"fetchedAt": int(time.time() * 1000), "errors": []}
+    try:
+        body = urllib.parse.urlencode({"grant_type": "client_credentials", "client_id": cid, "client_secret": sec}).encode()
+        req = urllib.request.Request(MC_API + "/auth/token", data=body, method="POST",
+                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            token = json.load(r)["access_token"]
+    except Exception as e:
+        code = getattr(e, "code", type(e).__name__)
+        out["errors"].append(f"Anmeldung bei meteoCORE fehlgeschlagen ({code})")
+        return out
+
+    def get(path, **q):
+        url = MC_API + path + "?" + urllib.parse.urlencode(q)
+        req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.load(r)
+
+    def pick(d, keys):
+        return {k: d[k] for k in keys if isinstance(d, dict) and k in d}
+
+    # 7 Tage aus allen Modellen
+    try:
+        wd = get("/api/v1/weather/daily", lat=lat, lon=lon, days=7, tz=tz_name)
+        info = wd.get("info", {})
+        srcs = info.get("sources") or []
+        out["daily"] = {
+            "days": [{**pick(d, DAY_KEYS), "sections": [pick(s, SECTION_KEYS) for s in d.get("sections") or []]} for d in wd.get("days", [])],
+            "models": len(srcs),
+            "members": (info.get("data_points") or {}).get("members"),
+            "attributions": sorted({s.get("attribution") for s in srcs if s.get("attribution")}),
+            "licences": sorted({s.get("licence") for s in srcs if s.get("licence")}),
+            "elevation_attribution": info.get("elevation_attribution"),
+        }
+    except Exception as e:
+        out["errors"].append(f"Tagesvorhersage nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
+
+    # 48 Stunden stündlich aus ICON-D2
+    try:
+        ts = get("/api/v1/forecast/icon-d2/timeseries/latest", lat=lat, lon=lon)
+        fc, info = ts.get("forecast") or {}, ts.get("info") or {}
+        times = [int(datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp() * 1000) for t in fc.get("valid_time", [])]
+        out["hourly"] = {"t": times, **{k: fc[k] for k in HOUR_KEYS if k in fc},
+                         "model": info.get("display_name") or "ICON-D2", "run": info.get("run"),
+                         "attribution": info.get("attribution"), "licence": info.get("licence")}
+    except Exception as e:
+        out["errors"].append(f"Stundenvorhersage nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
+
+    # Amtliche Warnungen am Standort
+    try:
+        w = get("/api/v1/warnings/point", lat=lat, lon=lon)
+        items = []
+        for x in w.get("warnings") or []:
+            it = pick(x, WARN_KEYS)
+            color = ((x.get("event_codes") or {}).get("AREA_COLOR") or "").split()
+            if len(color) == 3:
+                it["color"] = "#" + "".join(f"{int(c):02x}" for c in color)
+            items.append(it)
+        out["warnings"] = {"count": len(items), "max_severity": w.get("max_severity") or "", "items": items}
+    except Exception as e:
+        out["errors"].append(f"Warnungen nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
+
+    # Gewitterzellen, die den Standort in den nächsten 60 Minuten treffen
+    try:
+        sc = get("/api/v1/stormcells/point", lat=lat, lon=lon, lead=60)
+        cells = []
+        for c in sc.get("cells") or []:
+            # nur einfache Kennwerte, keine Positionen
+            cells.append({k: v for k, v in c.items() if isinstance(v, (int, float, str, bool)) and k not in ("lat", "lon", "latitude", "longitude", "x", "y")})
+        out["stormcells"] = {"count": len(cells), "cells": cells, "reference_time": sc.get("reference_time")}
+    except Exception as e:
+        out["errors"].append(f"Gewitterzellen nicht verfügbar ({getattr(e, 'code', type(e).__name__)})")
+
+    print(f"meteoCORE: {len((out.get('daily') or {}).get('days', []))} Tage, {len((out.get('hourly') or {}).get('t', []))} Stunden, "
+          f"{(out.get('warnings') or {}).get('count', '?')} Warnungen, {(out.get('stormcells') or {}).get('count', '?')} Gewitterzellen"
+          + (f", Fehler: {out['errors']}" if out["errors"] else ""))
+    return out
+
+
 def main():
     now = datetime.now(timezone.utc)
     info_raw = api("device/info", {})
@@ -155,8 +262,17 @@ def main():
     # Eine Zeile pro Tag mit fester Reihenfolge: Git sieht nur echte Änderungen
     daily_path.write_text("[\n" + ",\n".join(json.dumps(r, sort_keys=True, ensure_ascii=False, separators=(",", ":")) for r in rows) + "\n]\n")
 
+    # Vorhersage mit der genauen Position abfragen; die Position selbst wird nicht gespeichert
+    forecast = None
+    try:
+        forecast = meteocore_forecast(float(info_raw.get("latitude")), float(info_raw.get("longitude")), info["tz"])
+    except Exception as e:  # die Wetterseite soll auch ohne Vorhersage gebaut werden
+        print(f"meteoCORE: unerwarteter Fehler ({type(e).__name__}), Vorhersage übersprungen")
+
     out = {"v": 1, "savedAt": int(time.time() * 1000), "info": info, "rt": rt, "rtAt": rt_at, "daily": rows,
            "h5": [h5[k] for k in sorted(h5)], "h30": [h30[k] for k in sorted(h30)]}
+    if forecast:
+        out["forecast"] = forecast
     site = ROOT / "site"
     site.mkdir(exist_ok=True)
     (site / "data.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")))

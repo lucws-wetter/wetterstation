@@ -2,7 +2,7 @@ name: Wetterdaten aktualisieren
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # etwa alle 15 Minuten (GitHub startet manchmal etwas später)
+    - cron: "7,22,37,52 * * * *"   # etwa alle 15 Minuten; ungerade Minuten starten zuverlässiger
   workflow_dispatch:          # von Hand starten: Actions -> Wetterdaten aktualisieren -> Run workflow
   push:
     branches: [main]
@@ -31,6 +31,8 @@ jobs:
           ECOWITT_APPLICATION_KEY: ${{ secrets.ECOWITT_APPLICATION_KEY }}
           ECOWITT_API_KEY: ${{ secrets.ECOWITT_API_KEY }}
           ECOWITT_MAC: ${{ secrets.ECOWITT_MAC }}
+          METEOCORE_CLIENT_ID: ${{ secrets.METEOCORE_CLIENT_ID }}
+          METEOCORE_CLIENT_SECRET: ${{ secrets.METEOCORE_CLIENT_SECRET }}
         run: python3 scripts/fetch_data.py
 
       - name: Seite bauen

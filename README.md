@@ -19,8 +19,19 @@ Die API-Schlüssel stehen **nicht** im Repository, sondern als Secrets unter
 | `ECOWITT_APPLICATION_KEY` | Application Key aus ecowitt.net |
 | `ECOWITT_API_KEY` | API Key aus ecowitt.net |
 | `ECOWITT_MAC` | MAC-Adresse der Station |
+| `METEOCORE_CLIENT_ID` | Client-ID aus account.meteocore.com → API-Zugänge (optional, für die Vorhersage) |
+| `METEOCORE_CLIENT_SECRET` | Client-Secret dazu |
 
 GitHub Pages muss auf *Settings → Pages → Source: GitHub Actions* stehen.
+
+## Vorhersage
+
+Mit den meteoCORE-Zugangsdaten holt der Ablauf bei jedem Lauf einen frischen Token (OAuth2 Client Credentials,
+5 Minuten gültig) und fragt für den Stationsstandort ab: 7-Tage-Vorhersage aus allen Modellen (`/api/v1/weather/daily`),
+48 Stunden stündlich aus ICON-D2 (`/api/v1/forecast/icon-d2/timeseries/latest`), amtliche Warnungen (`/api/v1/warnings/point`)
+und Gewitterzellen der nächsten 60 Minuten (`/api/v1/stormcells/point`). Gespeichert werden nur ausgewählte Felder, keine
+Koordinaten oder Ortsnamen. Fehlen die Zugangsdaten oder antwortet meteoCORE nicht, wird die Seite ohne Vorhersage gebaut.
+API-Dokumentation: https://docs.meteocore.com/
 
 ## Dateien
 
