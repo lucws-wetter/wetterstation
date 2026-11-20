@@ -3,6 +3,8 @@
 Ein Dashboard für eine Ecowitt-Wetterstation: Live-Werte, Verläufe, Rekorde,
 Kenntage, Kalender-Heatmap, Regen-Jahresvergleich, Windrose und mehr.
 
+**Live:** https://lucws-wetter.github.io/wetterstation/
+
 ## So läuft die Webseite
 
 Eine GitHub Action (`.github/workflows/wetter.yml`) holt etwa alle 15 Minuten die Daten
