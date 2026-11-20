@@ -1,0 +1,1550 @@
+<title>LucWS Wetterstation</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: Instrumententafel bei Nacht. Sticky Statusleiste, Live-Hero links + Kacheln rechts,
+   darunter Abschnitte als breite Bänder mit Diagramm-Karten. Farbe kommt aus den Messwerten selbst. */
+:root {
+  color-scheme: dark;
+  --bg: #0a111e;
+  --band: #0e1727;
+  --surface: #121c2f;
+  --surface-2: #18243a;
+  --line: #22304a;
+  --line-2: #2f405f;
+  --fg: #e9eef7;
+  --fg-2: #b3bfd3;
+  --muted: #8291a9;
+  --accent: #6cc6ff;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --crit: #d03b3b;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
+  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 14px;
+  --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 10px 30px -18px rgba(0,0,0,.6);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #eaeff6; --band: #e2e9f2; --surface: #ffffff; --surface-2: #f3f6fa;
+    --line: #d9e1ec; --line-2: #c3cede; --fg: #0d1626; --fg-2: #3f4d66; --muted: #66748b;
+    --accent: #0a6fb8;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+    --shadow: 0 1px 2px rgba(16,30,54,.06), 0 10px 28px -20px rgba(16,30,54,.35);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eaeff6; --band: #e2e9f2; --surface: #ffffff; --surface-2: #f3f6fa;
+  --line: #d9e1ec; --line-2: #c3cede; --fg: #0d1626; --fg-2: #3f4d66; --muted: #66748b;
+  --accent: #0a6fb8;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --shadow: 0 1px 2px rgba(16,30,54,.06), 0 10px 28px -20px rgba(16,30,54,.35);
+}
+
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; scroll-padding-top: 120px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 400 15px/1.5 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+h2 { font-size: clamp(1.6rem, 1.2rem + 1.4vw, 2.2rem); line-height: 1.1; }
+h3 { font-size: 1.25rem; }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1280px; margin: 0 auto; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.eyebrow { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; font-weight: 600; color: var(--muted); }
+
+/* ---------- Statusleiste ---------- */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.topbar-in { display: flex; align-items: center; gap: 16px; padding-block: 10px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 260px; }
+.brand svg { flex: none; }
+.brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; line-height: 1; letter-spacing: .02em; }
+.brand-sub { color: var(--muted); font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); font-size: .85rem; color: var(--fg-2); white-space: nowrap; }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.pill[data-state="live"] i { background: var(--good); box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 60%, transparent); animation: pulse 2s infinite; }
+.pill[data-state="stale"] i, .pill[data-state="snap"] i { background: var(--warn); }
+.pill[data-state="error"] i { background: var(--crit); }
+.pill[data-state="load"] i { background: var(--accent); animation: blink 1s infinite; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes blink { 50% { opacity: .3; } }
+.icon-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; color: var(--fg-2); }
+.icon-btn:hover { border-color: var(--line-2); color: var(--fg); }
+.icon-btn.spin svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.secnav { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+.secnav::-webkit-scrollbar { display: none; }
+.secnav a { flex: none; text-decoration: none; color: var(--fg-2); font-size: .88rem; padding: 4px 10px; border-radius: 8px; }
+.secnav a:hover { background: var(--surface-2); color: var(--fg); }
+
+.banner { margin-top: 14px; padding: 10px 14px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--crit) 50%, var(--line)); background: color-mix(in srgb, var(--crit) 12%, var(--surface)); font-size: .92rem; }
+.banner.info { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
+
+/* ---------- Abschnitte ---------- */
+.sec { padding-block: 40px 8px; }
+.sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 18px; }
+.sec-head p { margin: 6px 0 0; color: var(--fg-2); max-width: 65ch; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--line); }
+.seg button { border: 0; background: transparent; padding: 5px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-2); font-size: .9rem; font-weight: 500; }
+.seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+
+/* ---------- Jetzt ---------- */
+.now-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 2fr); gap: 14px; margin-top: 22px; }
+@media (max-width: 980px) { .now-grid { grid-template-columns: minmax(0, 1fr); } }
+.hero {
+  --heat: #6cc6ff;
+  position: relative; overflow: hidden; padding: 20px 22px 18px; display: flex; flex-direction: column; gap: 10px;
+  background:
+    radial-gradient(130% 90% at 0% 0%, color-mix(in srgb, var(--heat) 34%, transparent), transparent 62%),
+    radial-gradient(90% 70% at 100% 100%, color-mix(in srgb, var(--heat) 14%, transparent), transparent 70%),
+    var(--surface);
+}
+.hero-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.hero-temp { display: flex; align-items: flex-start; gap: 4px; font-family: var(--font-display); font-weight: 600; line-height: .9; }
+.hero-temp #now-t { font-size: clamp(5rem, 3.6rem + 5vw, 7.4rem); letter-spacing: -.02em; }
+.hero-temp .unit { font-size: 2rem; margin-top: .5rem; color: var(--fg-2); }
+.trend { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; font-size: .92rem; color: var(--fg-2); }
+.trend span { white-space: nowrap; }
+.trend svg { flex: none; }
+.hero-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.kv { display: flex; flex-direction: column; min-width: 0; }
+.kv .lbl { font-size: .78rem; color: var(--muted); }
+.kv b { font-family: var(--font-display); font-size: 1.45rem; font-weight: 600; line-height: 1.1; }
+.kv small { color: var(--muted); font-size: .78rem; }
+.spark { width: 100%; height: 64px; display: block; }
+.heatbar { position: relative; margin-top: 4px; padding-bottom: 16px; }
+.heatbar .grad { height: 8px; border-radius: 999px; }
+.heatbar .range { position: absolute; top: -3px; height: 14px; border-radius: 999px; border: 2px solid var(--fg); opacity: .75; }
+.heatbar .mark { position: absolute; top: -6px; width: 4px; height: 20px; margin-left: -2px; border-radius: 3px; background: var(--fg); box-shadow: 0 0 0 2px var(--surface); }
+.heatbar .ticks { position: absolute; left: 0; right: 0; top: 12px; font-size: .7rem; color: var(--muted); }
+.heatbar .ticks span { position: absolute; transform: translateX(-50%); }
+
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1180px) and (min-width: 981px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 500px) { .tiles { grid-template-columns: minmax(0, 1fr); } }
+.tile { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tile-h { display: flex; align-items: center; gap: 8px; }
+.tile-h .ico { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: color-mix(in srgb, var(--c, var(--accent)) 20%, transparent); color: var(--c, var(--accent)); flex: none; }
+.tile-h .eyebrow { flex: 1; }
+.tile .big { font-family: var(--font-display); font-weight: 600; font-size: 2.3rem; line-height: 1; }
+.tile .big small { font-size: 1rem; color: var(--fg-2); margin-left: 3px; font-weight: 500; }
+.tile .sub { color: var(--fg-2); font-size: .88rem; }
+.tile .mini { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+.tile .mini .kv b { font-size: 1.05rem; }
+.tile .mini .kv .lbl { font-size: .72rem; }
+.wind-row { display: flex; gap: 12px; align-items: center; }
+.compass { width: 92px; height: 92px; flex: none; }
+.bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 999px; background: var(--c, var(--accent)); }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: .78rem; font-weight: 600; background: color-mix(in srgb, var(--c, var(--accent)) 18%, transparent); color: var(--fg); border: 1px solid color-mix(in srgb, var(--c, var(--accent)) 45%, transparent); white-space: nowrap; }
+.chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--accent)); }
+
+.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-top: 14px; }
+.cmp { padding: 12px 14px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; align-items: center; }
+.cmp .rank { grid-row: span 2; font-family: var(--font-display); font-weight: 700; font-size: 1.7rem; white-space: nowrap; line-height: 1; color: var(--fg); min-width: 2.6ch; text-align: center; padding: 6px 8px; border-radius: 10px; background: color-mix(in srgb, var(--c) 18%, transparent); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
+.cmp .rank small { display: block; font-size: .62rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-2); margin-top: 3px; }
+.cmp .t1 { font-weight: 600; font-size: .95rem; min-width: 0; }
+.cmp .t2 { color: var(--fg-2); font-size: .84rem; min-width: 0; }
+.extra { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+.extra .tile { padding: 10px 14px; }
+
+/* ---------- Diagramme ---------- */
+.chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 860px) { .chart-grid { grid-template-columns: minmax(0, 1fr); } }
+.chart-card { margin: 0; padding: 14px 14px 6px; min-width: 0; }
+.chart-card.span2 { grid-column: 1 / -1; }
+.chart-card figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 0 4px 4px; }
+.chart-card figcaption .t { font-family: var(--font-display); font-weight: 600; font-size: 1.12rem; }
+.chart-card figcaption .v { color: var(--fg-2); font-size: .86rem; }
+.chart { width: 100%; height: 210px; }
+.chart.tall { height: 420px; }
+.chart.mid { height: 320px; }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.scroll-x > .chart { min-width: 760px; }
+.legend-note { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .82rem; color: var(--fg-2); padding: 4px 4px 8px; }
+.legend-note span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-note i { width: 14px; height: 8px; border-radius: 3px; display: inline-block; }
+
+/* ---------- Rekorde ---------- */
+.rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.rec-group-title { display: flex; align-items: center; gap: 10px; margin: 22px 0 10px; }
+.rec-group-title h3 { font-size: 1.15rem; }
+.rec-group-title .ln { flex: 1; height: 1px; background: var(--line); }
+.rec { position: relative; padding: 14px 16px 12px; overflow: hidden; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rec::after { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--c); }
+.rec .rl { font-size: .86rem; color: var(--fg-2); font-weight: 500; }
+.rec .rl small { color: var(--muted); font-weight: 400; }
+.rec .rv { font-family: var(--font-display); font-size: 2.2rem; font-weight: 600; line-height: 1.05; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.rec .rv small { font-size: 1rem; color: var(--fg-2); font-weight: 500; }
+.rec .rd { font-size: .88rem; color: var(--fg); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rec .rd .muted { font-size: .8rem; }
+.rec ol { list-style: none; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--line); display: grid; gap: 1px; font-size: .8rem; color: var(--fg-2); }
+.rec ol li { display: flex; justify-content: space-between; gap: 8px; }
+.rec ol li b { font-weight: 600; color: var(--fg); }
+.rec .new { position: absolute; top: 12px; right: 12px; }
+.note { font-size: .84rem; color: var(--muted); margin: 14px 0 0; max-width: 90ch; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--fg-2); cursor: pointer; }
+.toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+/* ---------- Tabellen ---------- */
+.table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+thead th { font-family: var(--font-display); font-weight: 600; font-size: .9rem; color: var(--fg-2); letter-spacing: .02em; background: var(--surface-2); vertical-align: bottom; }
+thead th:first-child { background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--surface-2); }
+td .cell { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+td .cell .bar { width: 52px; height: 4px; }
+td small { color: var(--muted); font-size: .74rem; }
+td.tint { background: color-mix(in srgb, var(--tc) 26%, var(--surface)); }
+tbody tr:hover td.tint { background: color-mix(in srgb, var(--tc) 36%, var(--surface)); }
+th small { display: block; font-family: var(--font-body); font-weight: 400; color: var(--muted); font-size: .72rem; letter-spacing: 0; }
+
+/* ---------- An diesem Tag ---------- */
+.otd { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.otd .card { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; position: relative; overflow: hidden; }
+.otd .yr { font-family: var(--font-display); font-weight: 700; font-size: 1.6rem; line-height: 1; }
+.otd .tbar { height: 10px; border-radius: 999px; }
+.otd .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.otd .kv b { font-size: 1.2rem; white-space: nowrap; }
+.otd .kv .chip { align-self: flex-start; font-size: .68rem; padding: 0 7px; margin-top: 2px; }
+
+/* ---------- Footer & Dialog ---------- */
+footer { margin-top: 48px; border-top: 1px solid var(--line); padding-block: 22px 40px; color: var(--muted); font-size: .85rem; }
+footer p { margin: 4px 0; max-width: 100ch; }
+.modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(5,10,20,.55); padding: 16px; }
+.modal .card { width: min(520px, 100%); padding: 20px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow: auto; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: .85rem; color: var(--fg-2); }
+.field input { padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--surface-2); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .86rem; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.btn { padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface-2); cursor: pointer; font-weight: 600; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.loading-veil { opacity: .55; transition: opacity .3s; }
+</style>
+
+<div class="topbar">
+  <div class="wrap gutter">
+    <div class="topbar-in">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3f63d6"/><stop offset=".5" stop-color="#5fcfc0"/><stop offset="1" stop-color="#f08a2c"/></linearGradient></defs><rect width="34" height="34" rx="9" fill="url(#lg)"/><path d="M17 7v20M17 7l-4 4M17 7l4 4" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/><circle cx="17" cy="23" r="4" fill="#fff"/></svg>
+        <div style="min-width:0">
+          <div class="brand-name" id="st-name">Wetterstation</div>
+          <div class="brand-sub" id="st-sub">Verbinde mit Ecowitt …</div>
+        </div>
+      </div>
+      <div class="status">
+        <span class="pill" id="st-pill" data-state="load" role="status"><i></i><span id="st-text">Lade …</span></span>
+        <button class="icon-btn" id="btn-refresh" title="Jetzt aktualisieren" aria-label="Jetzt aktualisieren"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
+        <button class="icon-btn" id="btn-settings" title="Einstellungen" aria-label="Einstellungen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      </div>
+    </div>
+    <nav class="secnav" aria-label="Abschnitte">
+      <a href="#jetzt">Jetzt</a><a href="#verlauf">Verlauf</a><a href="#rekorde">Rekorde</a><a href="#jahresgang">Jahresgang</a><a href="#kalender">Kalender</a><a href="#regen">Regen</a><a href="#kenntage">Kenntage</a><a href="#monate">Monatsrekorde</a><a href="#wind">Wind</a><a href="#diesertag">An diesem Tag</a>
+    </nav>
+  </div>
+</div>
+
+<main class="wrap gutter">
+  <div id="banner" hidden></div>
+
+  <!-- ================= JETZT ================= -->
+  <section id="jetzt" class="sec" style="padding-top:22px">
+    <div class="now-grid">
+      <article class="card hero" id="hero">
+        <div class="hero-top"><span class="eyebrow">Außentemperatur</span><span class="muted num" id="now-time">–</span></div>
+        <div class="hero-temp"><span id="now-t">–</span><span class="unit">°C</span></div>
+        <div class="trend" id="now-trend">&nbsp;</div>
+        <div class="hero-row">
+          <div class="kv"><span class="lbl">Gefühlt</span><b id="now-fl">–</b><small id="now-fl2">&nbsp;</small></div>
+          <div class="kv"><span class="lbl">Heute max</span><b id="now-tx">–</b><small id="now-txt">&nbsp;</small></div>
+          <div class="kv"><span class="lbl">Heute min</span><b id="now-tn">–</b><small id="now-tnt">&nbsp;</small></div>
+        </div>
+        <svg class="spark" id="spark-t" viewBox="0 0 300 64" preserveAspectRatio="none" aria-label="Temperaturverlauf der letzten 24 Stunden"></svg>
+        <div class="heatbar" id="heatbar" aria-hidden="true"><div class="grad" id="heat-grad"></div><div class="range" id="heat-range"></div><div class="mark" id="heat-mark"></div><div class="ticks" id="heat-ticks"></div></div>
+      </article>
+      <div class="tiles">
+        <article class="card tile" style="--c:var(--s7)">
+          <div class="tile-h"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h7"/></svg></span><span class="eyebrow">Wind</span><span class="chip" id="w-bft" style="--c:var(--s7)">Bft –</span></div>
+          <div class="wind-row">
+            <svg class="compass" id="compass" viewBox="0 0 100 100" role="img" aria-label="Windrichtung"></svg>
+            <div style="min-width:0">
+              <div class="big num" id="w-speed">–<small>km/h</small></div>
+              <div class="sub" id="w-dir">–</div>
+              <div class="sub" id="w-gust">Böen –</div>
+            </div>
+          </div>
+          <div class="mini">
+            <div class="kv"><span class="lbl">Max. Böe heute</span><b id="w-gmax">–</b></div>
+            <div class="kv"><span class="lbl">10-Min-Richtung</span><b id="w-dir10">–</b></div>
+            <div class="kv"><span class="lbl">Beaufort</span><b id="w-bftname" style="font-size:.95rem">–</b></div>
+          </div>
+        </article>
+        <article class="card tile" style="--c:var(--s1)">
+          <div class="tile-h"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z"/></svg></span><span class="eyebrow">Niederschlag</span><span class="chip" id="r-state" hidden style="--c:var(--s1)"><i></i>regnet</span></div>
+          <div class="big num" id="r-day">–<small>mm heute</small></div>
+          <div class="sub" id="r-rate">Rate –</div>
+          <div class="mini">
+            <div class="kv"><span class="lbl">Woche</span><b id="r-week">–</b></div>
+            <div class="kv"><span class="lbl">Monat</span><b id="r-month">–</b></div>
+            <div class="kv"><span class="lbl">Jahr</span><b id="r-year">–</b></div>
+          </div>
+        </article>
+        <article class="card tile" style="--c:var(--s6)">
+          <div class="tile-h"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 13l4-4M12 5V3"/></svg></span><span class="eyebrow">Luftdruck</span></div>
+          <div class="big num" id="p-rel">–<small>hPa</small></div>
+          <div class="sub trend" id="p-trend">–</div>
+          <svg class="spark" id="spark-p" viewBox="0 0 300 64" preserveAspectRatio="none" style="height:44px" aria-label="Luftdruck der letzten 24 Stunden"></svg>
+          <div class="mini">
+            <div class="kv"><span class="lbl">Absolut</span><b id="p-abs">–</b></div>
+            <div class="kv"><span class="lbl">24 h max</span><b id="p-max">–</b></div>
+            <div class="kv"><span class="lbl">24 h min</span><b id="p-min">–</b></div>
+          </div>
+        </article>
+        <article class="card tile" style="--c:var(--s3)">
+          <div class="tile-h"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 16a4 4 0 0 1-.5-8A5.5 5.5 0 0 1 17 7a4.5 4.5 0 0 1 .5 9"/><path d="M9 19v1M13 18v2M17 19v1"/></svg></span><span class="eyebrow">Luftfeuchte</span></div>
+          <div class="big num" id="h-out">–<small>%</small></div>
+          <div class="bar" style="--c:var(--s3)"><i id="h-bar" style="width:0"></i></div>
+          <div class="sub" id="h-hint">&nbsp;</div>
+          <div class="mini">
+            <div class="kv"><span class="lbl">Taupunkt</span><b id="h-dew">–</b></div>
+            <div class="kv"><span class="lbl">Spread</span><b id="h-spread">–</b></div>
+            <div class="kv"><span class="lbl">Heute min</span><b id="h-min">–</b></div>
+          </div>
+        </article>
+        <article class="card tile" style="--c:var(--s4)">
+          <div class="tile-h"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span><span class="eyebrow">Sonne &amp; UV</span><span class="chip" id="uv-chip">UV –</span></div>
+          <div class="big num" id="s-rad">–<small>W/m²</small></div>
+          <div class="sub" id="s-max">Heute max –</div>
+          <div class="mini">
+            <div class="kv"><span class="lbl">Aufgang</span><b id="s-rise">–</b></div>
+            <div class="kv"><span class="lbl">Untergang</span><b id="s-set">–</b></div>
+            <div class="kv"><span class="lbl">Tageslänge</span><b id="s-len">–</b></div>
+          </div>
+        </article>
+        <article class="card tile" style="--c:var(--s5)">
+          <div class="tile-h"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></span><span class="eyebrow">Innen</span></div>
+          <div class="big num" id="i-t">–<small>°C</small></div>
+          <div class="sub" id="i-h">– % Luftfeuchte</div>
+          <div class="mini">
+            <div class="kv"><span class="lbl">Taupunkt</span><b id="i-dew">–</b></div>
+            <div class="kv"><span class="lbl">Heute max</span><b id="i-max">–</b></div>
+            <div class="kv"><span class="lbl">Heute min</span><b id="i-min">–</b></div>
+          </div>
+        </article>
+      </div>
+    </div>
+    <div class="rec-group-title"><h3>Heute im Vergleich</h3><span class="ln"></span><span class="muted" id="cmp-n" style="font-size:.84rem"></span></div>
+    <div class="compare" id="compare"></div>
+    <div class="extra" id="extra"></div>
+  </section>
+
+  <!-- ================= VERLAUF ================= -->
+  <section id="verlauf" class="sec">
+    <div class="sec-head">
+      <div><h2>Verlauf</h2><p id="hist-sub">Messwerte im Detail.</p></div>
+      <div class="seg" id="seg-range" role="group" aria-label="Zeitraum"><button data-v="24h" aria-pressed="true">24 Stunden</button><button data-v="7d" aria-pressed="false">7 Tage</button></div>
+    </div>
+    <div class="chart-grid">
+      <figure class="card chart-card"><figcaption><span class="t">Temperatur &amp; Taupunkt</span><span class="v num" id="cv-temp"></span></figcaption><div class="chart" id="ch-temp"></div></figure>
+      <figure class="card chart-card"><figcaption><span class="t">Niederschlag</span><span class="v num" id="cv-rain"></span></figcaption><div class="chart" id="ch-rain"></div></figure>
+      <figure class="card chart-card"><figcaption><span class="t">Wind &amp; Böen</span><span class="v num" id="cv-wind"></span></figcaption><div class="chart" id="ch-wind"></div></figure>
+      <figure class="card chart-card"><figcaption><span class="t">Luftdruck</span><span class="v num" id="cv-press"></span></figcaption><div class="chart" id="ch-press"></div></figure>
+      <figure class="card chart-card"><figcaption><span class="t">Luftfeuchte</span><span class="v num" id="cv-hum"></span></figcaption><div class="chart" id="ch-hum"></div></figure>
+      <figure class="card chart-card"><figcaption><span class="t">Sonnenstrahlung</span><span class="v num" id="cv-sun"></span></figcaption><div class="chart" id="ch-sun"></div></figure>
+    </div>
+  </section>
+
+  <!-- ================= REKORDE ================= -->
+  <section id="rekorde" class="sec">
+    <div class="sec-head">
+      <div><h2>Rekorde</h2><p id="rec-sub">Die Extremwerte der Station.</p></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+        <div class="seg" id="seg-rec" role="group" aria-label="Zeitraum der Rekorde"></div>
+        <label class="toggle"><input type="checkbox" id="chk-outlier" checked> Verdächtige Messwerte ausblenden</label>
+      </div>
+    </div>
+    <div id="rec-wrap"></div>
+    <p class="note" id="rec-note"></p>
+  </section>
+
+  <!-- ================= JAHRESGANG ================= -->
+  <section id="jahresgang" class="sec">
+    <div class="sec-head">
+      <div><h2>Jahresgang</h2><p>Jeder Balken reicht vom Tiefst- zum Höchstwert eines Tages und ist nach dem Tagesmittel eingefärbt. Die graue Fläche zeigt den Rekordbereich der Station für jeden Kalendertag.</p></div>
+      <div class="seg" id="seg-year" role="group" aria-label="Jahr"></div>
+    </div>
+    <figure class="card chart-card" style="margin:0">
+      <div class="legend-note"><span><i id="lg-env"></i>Rekordbereich aller Jahre</span><span><i id="lg-avg" style="height:2px"></i>Mittel aller Jahre (Max / Min)</span><span><i id="lg-heat"></i>Tagesspanne, Farbe = Tagesmittel</span></div>
+      <div class="scroll-x"><div class="chart tall" id="ch-year"></div></div>
+    </figure>
+  </section>
+
+  <!-- ================= KALENDER ================= -->
+  <section id="kalender" class="sec">
+    <div class="sec-head">
+      <div><h2>Wetter-Kalender</h2><p id="cal-sub">Jeder Tag seit Messbeginn als farbiges Kästchen.</p></div>
+      <div class="seg" id="seg-cal" role="group" aria-label="Messgröße"></div>
+    </div>
+    <figure class="card chart-card" style="margin:0"><div class="scroll-x"><div class="chart" id="ch-cal" style="height:520px"></div></div></figure>
+  </section>
+
+  <!-- ================= REGEN ================= -->
+  <section id="regen" class="sec">
+    <div class="sec-head"><div><h2>Regen im Jahresvergleich</h2><p>Aufsummierter Niederschlag ab 1. Januar und Monatssummen je Jahr.</p></div></div>
+    <div class="chart-grid">
+      <figure class="card chart-card"><figcaption><span class="t">Jahressumme im Verlauf</span><span class="v num" id="cv-raincum"></span></figcaption><div class="chart mid" id="ch-raincum"></div></figure>
+      <figure class="card chart-card"><figcaption><span class="t">Monatssummen</span><span class="v">mm</span></figcaption><div class="chart mid" id="ch-rainmon"></div></figure>
+    </div>
+  </section>
+
+  <!-- ================= KENNTAGE ================= -->
+  <section id="kenntage" class="sec">
+    <div class="sec-head"><div><h2>Kenntage</h2><p>Klimatologische Kenntage nach den Schwellen des Deutschen Wetterdienstes, gezählt pro Jahr.</p></div></div>
+    <div class="table-wrap"><table id="tbl-kenn"></table></div>
+    <p class="note" id="kenn-note"></p>
+  </section>
+
+  <!-- ================= MONATE ================= -->
+  <section id="monate" class="sec">
+    <div class="sec-head"><div><h2>Monatsrekorde</h2><p>Die Extreme jedes Kalendermonats über alle Jahre. Temperaturzellen sind nach ihrem Wert eingefärbt.</p></div></div>
+    <div class="table-wrap"><table id="tbl-mon"></table></div>
+    <figure class="card chart-card" style="margin:14px 0 0"><figcaption><span class="t">Monatsmittel der Temperatur</span><span class="v">°C</span></figcaption><div class="chart mid" id="ch-tempmon"></div></figure>
+  </section>
+
+  <!-- ================= WIND ================= -->
+  <section id="wind" class="sec">
+    <div class="sec-head">
+      <div><h2>Windrose</h2><p id="rose-sub">Aus welcher Richtung der Wind wie oft und wie stark weht.</p></div>
+      <div class="seg" id="seg-rose" role="group" aria-label="Datenbasis"><button data-v="7d" aria-pressed="true">Letzte 7 Tage</button><button data-v="all" aria-pressed="false">Gesamt (Tagesmittel)</button></div>
+    </div>
+    <div class="chart-grid">
+      <figure class="card chart-card"><div class="chart" id="ch-rose" style="height:380px"></div></figure>
+      <figure class="card chart-card"><figcaption><span class="t">Stärkste Böen pro Monat</span><span class="v">km/h</span></figcaption><div class="chart" id="ch-gustmon" style="height:340px"></div></figure>
+    </div>
+  </section>
+
+  <!-- ================= AN DIESEM TAG ================= -->
+  <section id="diesertag" class="sec">
+    <div class="sec-head"><div><h2 id="otd-title">An diesem Tag</h2><p>Der heutige Kalendertag in allen Jahren der Station.</p></div></div>
+    <div class="otd" id="otd"></div>
+  </section>
+
+  <footer id="foot"></footer>
+</main>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="dlg-t">
+  <div class="card">
+    <h3 id="dlg-t">Einstellungen</h3>
+    <p class="muted" style="margin:0;font-size:.9rem">Die Schlüssel findest du unter ecowitt.net → Benutzer → Private Center → API Keys. Sie bleiben nur in diesem Browser gespeichert.</p>
+    <div class="field"><label for="f-app">Application Key</label><input id="f-app" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="f-api">API Key</label><input id="f-api" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="f-mac">MAC-Adresse der Station</label><input id="f-mac" autocomplete="off" spellcheck="false" placeholder="AA:BB:CC:DD:EE:FF"></div>
+    <div class="btn-row">
+      <button class="btn" id="btn-clear">Zwischenspeicher leeren</button>
+      <button class="btn" id="btn-cancel">Abbrechen</button>
+      <button class="btn primary" id="btn-save">Speichern &amp; laden</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   KONFIGURATION – hier kannst du Schlüssel und Datenfilter anpassen.
+   ===================================================================== */
+const CONFIG = __CONFIG__;
+const SNAPSHOT = __SNAPSHOT__;
+
+/* ---------------------------------------------------------------- */
+const API = "https://api.ecowitt.net/api/v3/";
+const UNITS = { temp_unitid: 1, pressure_unitid: 3, wind_speed_unitid: 7, rainfall_unitid: 12, solar_irradiance_unitid: 16 };
+const CB_HIST = "outdoor,indoor,solar_and_uvi,rainfall,rainfall_piezo,wind,pressure";
+const FIELD = {
+  "outdoor.temperature": "t", "outdoor.temperature_high": "tx", "outdoor.temperature_low": "tn",
+  "outdoor.feels_like": "fl", "outdoor.dew_point": "td", "outdoor.humidity": "h",
+  "outdoor.humidity_high": "hx", "outdoor.humidity_low": "hn",
+  "indoor.temperature": "ti", "indoor.temperature_high": "tix", "indoor.temperature_low": "tin", "indoor.humidity": "hi",
+  "solar_and_uvi.solar": "sr", "solar_and_uvi.uvi": "uv",
+  "rainfall.daily": "rd", "rainfall.rain_rate": "rr",
+  "rainfall_piezo.daily": "rd", "rainfall_piezo.rain_rate": "rr",
+  "wind.wind_speed": "ws", "wind.wind_gust": "wg", "wind.wind_direction": "wd",
+  "pressure.relative": "p", "pressure.relative_high": "px", "pressure.relative_low": "pn"
+};
+const HEAT = [[-20,"#3a1f7a"],[-15,"#4b3bb0"],[-10,"#3f63d6"],[-5,"#3b8fe6"],[0,"#4fb8ec"],[5,"#5fcfc0"],[10,"#8fd67a"],[15,"#d9d64a"],[20,"#f5b638"],[25,"#f08a2c"],[30,"#e2562b"],[35,"#c5263a"],[40,"#8e1446"]];
+const RAMP = {
+  rain: ["#cde2fb","#9ec5f4","#6da7ec","#3987e5","#256abf","#184f95","#0d366b"],
+  sun:  ["#fde7c4","#fbcf86","#f7b046","#ec8d17","#cc6a07","#9c4c05","#6f3603"],
+  wind: ["#e3dffb","#c3bbf4","#9f93ec","#7b6be2","#5a48c9","#3e2f99","#2a1f70"]
+};
+const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const MON3 = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+const DIRS = ["N","NNO","NO","ONO","O","OSO","SO","SSO","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+const BFT = [[1,"Windstille"],[6,"leiser Zug"],[12,"leichte Brise"],[20,"schwache Brise"],[29,"mäßige Brise"],[39,"frische Brise"],[50,"starker Wind"],[62,"steifer Wind"],[75,"stürmischer Wind"],[89,"Sturm"],[103,"schwerer Sturm"],[118,"orkanartiger Sturm"],[Infinity,"Orkan"]];
+const UVSCALE = [[3,"niedrig","#3ea72d"],[6,"mäßig","#e8c400"],[8,"hoch","#f18b00"],[11,"sehr hoch","#e53210"],[Infinity,"extrem","#b567a4"]];
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const S = {
+  info: null, rt: null, rtAt: 0, daily: new Map(), h5: [], h30: [], savedAt: 0,
+  mode: "live", range: "24h", recScope: "all", year: null, cal: "t", rose: "7d", outliers: true,
+  excluded: []
+};
+
+/* ---------------- Hilfsfunktionen ---------------- */
+const $ = id => document.getElementById(id);
+const isNum = v => typeof v === "number" && isFinite(v);
+const fmt = (v, d = 1) => isNum(v) ? v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d }).replace("-", "−") : "–";
+const fmtInt = v => isNum(v) ? Math.round(v).toLocaleString("de-DE").replace("-", "−") : "–";
+const fmtAx = (v, u = "") => (Number.isInteger(v) ? v.toLocaleString("de-DE") : v.toLocaleString("de-DE", { maximumFractionDigits: 1 })).replace("-", "−") + u;
+const sum = a => a.reduce((s, x) => s + x, 0);
+const mean = a => a.length ? sum(a) / a.length : null;
+const maxOf = a => a.length ? Math.max(...a) : null;
+const minOf = a => a.length ? Math.min(...a) : null;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function tok(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function isDark() { return tok("color-scheme").includes("dark") || getComputedStyle(document.documentElement).colorScheme === "dark"; }
+
+const TZ = () => (S.info && S.info.tz) || "Europe/Berlin";
+let _dtf = null, _dtfTz = null;
+function parts(ms) {
+  if (!_dtf || _dtfTz !== TZ()) { _dtfTz = TZ(); _dtf = new Intl.DateTimeFormat("en-CA", { timeZone: _dtfTz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }); }
+  const o = {}; for (const p of _dtf.formatToParts(new Date(ms))) o[p.type] = p.value; return o;
+}
+const localDate = ms => { const p = parts(ms); return `${p.year}-${p.month}-${p.day}`; };
+const apiDT = ms => { const p = parts(ms); return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`; };
+const hhmm = ms => { const p = parts(ms); return `${p.hour}:${p.minute}`; };
+const isoUTC = s => new Date(s * 1000).toISOString().slice(0, 10);
+function addDays(iso, n) { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function diffDays(a, b) { return Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 864e5); }
+const fmtD = iso => iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : "–";
+const fmtDs = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
+const wday = iso => new Date(iso + "T12:00:00Z").toLocaleDateString("de-DE", { weekday: "short", timeZone: "UTC" });
+const dim = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+function ago(ms) {
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) return `vor ${s} s`; if (s < 3600) return `vor ${Math.round(s / 60)} min`;
+  if (s < 86400) return `vor ${Math.round(s / 3600)} h`; return `vor ${Math.round(s / 86400)} Tagen`;
+}
+function hex2rgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function rgb2hex(r) { return "#" + r.map(x => Math.round(x).toString(16).padStart(2, "0")).join(""); }
+function heat(v) {
+  if (!isNum(v)) return tok("--muted");
+  if (v <= HEAT[0][0]) return HEAT[0][1];
+  for (let i = 1; i < HEAT.length; i++) {
+    if (v <= HEAT[i][0]) { const [a, ca] = HEAT[i - 1], [b, cb] = HEAT[i]; const t = (v - a) / (b - a); const A = hex2rgb(ca), B = hex2rgb(cb); return rgb2hex(A.map((x, j) => x + (B[j] - x) * t)); }
+  }
+  return HEAT[HEAT.length - 1][1];
+}
+const heatGradientCSS = (lo = -20, hi = 40) => `linear-gradient(90deg, ${HEAT.filter(s => s[0] >= lo && s[0] <= hi).map(s => `${s[1]} ${((s[0] - lo) / (hi - lo) * 100).toFixed(1)}%`).join(", ")})`;
+function ramp(name) { const r = RAMP[name].slice(); return isDark() ? r.reverse() : r; }
+function yearColor(y) { const slots = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8"]; return tok(slots[((y - 2023) % 8 + 8) % 8]); }
+function compass(deg) { return isNum(deg) ? DIRS[Math.round(deg / 22.5) % 16] : "–"; }
+function beaufort(kmh) { for (let i = 0; i < BFT.length; i++) if (kmh < BFT[i][0]) return [i, BFT[i][1]]; return [12, "Orkan"]; }
+function uvInfo(u) { for (const s of UVSCALE) if (u < s[0]) return s; return UVSCALE[UVSCALE.length - 1]; }
+const MMDD = (() => { const a = []; for (let d = new Date(Date.UTC(2024, 0, 1)); d.getUTCFullYear() === 2024; d.setUTCDate(d.getUTCDate() + 1)) a.push(d.toISOString().slice(5, 10)); return a; })();
+const doyIdx = new Map(MMDD.map((m, i) => [m, i]));
+
+/* ---------------- Speicher ---------------- */
+const store = {
+  get(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch {} }
+};
+function keys() {
+  const saved = store.get("ws-keys");
+  const k = saved && saved.applicationKey ? saved : CONFIG;
+  return k.applicationKey && k.apiKey && k.mac ? { applicationKey: k.applicationKey.trim(), apiKey: k.apiKey.trim(), mac: k.mac.trim().toUpperCase() } : null;
+}
+const cacheKey = () => "ws-cache-v1:" + ((keys() && keys().mac) || "snapshot");
+function saveCache() {
+  const obj = { v: 1, savedAt: Date.now(), info: S.info, rt: S.rt, rtAt: S.rtAt, daily: [...S.daily.values()], h5: S.h5, h30: S.h30 };
+  store.set(cacheKey(), obj);
+  window.__WS_CACHE__ = obj;
+}
+function applyCache(c) {
+  if (!c || c.v !== 1) return false;
+  S.info = c.info || S.info; S.rt = c.rt || S.rt; S.rtAt = c.rtAt || 0; S.savedAt = c.savedAt || 0;
+  S.daily = new Map((c.daily || []).map(r => [r.d, r]));
+  S.h5 = c.h5 || []; S.h30 = c.h30 || [];
+  return true;
+}
+
+/* ---------------- API ---------------- */
+let lastCall = 0;
+async function api(path, params) {
+  const k = keys(); if (!k) throw new Error("Keine API-Schlüssel hinterlegt.");
+  const wait = lastCall + 450 - Date.now(); if (wait > 0) await sleep(wait); lastCall = Date.now();
+  const u = new URL(API + path);
+  u.searchParams.set("application_key", k.applicationKey); u.searchParams.set("api_key", k.apiKey); u.searchParams.set("mac", k.mac);
+  for (const [a, b] of Object.entries({ ...UNITS, ...params })) u.searchParams.set(a, b);
+  let r;
+  try { r = await fetch(u.toString(), { cache: "no-store" }); }
+  catch (e) { throw new Error("Keine Verbindung zu api.ecowitt.net. Bist du online?"); }
+  if (!r.ok) throw new Error(`Ecowitt antwortet mit HTTP ${r.status}.`);
+  const j = await r.json();
+  if (j.code !== 0) throw new Error(`Ecowitt meldet: ${j.msg} (Code ${j.code}). Prüfe Schlüssel und MAC in den Einstellungen.`);
+  return j.data;
+}
+function parseHist(data, daily) {
+  const out = new Map();
+  if (!data || Array.isArray(data)) return out;
+  for (const [g, fields] of Object.entries(data)) {
+    if (!fields || typeof fields !== "object") continue;
+    for (const [f, s] of Object.entries(fields)) {
+      const k = FIELD[g + "." + f]; if (!k || !s || !s.list || Array.isArray(s.list)) continue;
+      const piezo = g === "rainfall_piezo";
+      for (const [ts, v] of Object.entries(s.list)) {
+        if (v === "" || v === "-" || v == null) continue; const n = +v; if (!isFinite(n)) continue;
+        const key = daily ? isoUTC(+ts) : +ts * 1000;
+        let r = out.get(key); if (!r) { r = daily ? { d: key } : { ts: key }; out.set(key, r); }
+        if (piezo && r[k] != null) continue; r[k] = n;
+      }
+    }
+  }
+  return out;
+}
+const rv = (g, f) => { const x = S.rt && S.rt[g] && S.rt[g][f]; return x && x.value !== "" && x.value != null && isFinite(+x.value) ? +x.value : null; };
+const rainGroup = () => (S.rt && S.rt.rainfall) ? "rainfall" : "rainfall_piezo";
+
+async function loadInfo() {
+  const d = await api("device/info", {});
+  S.info = { name: d.name || "Wetterstation", tz: d.date_zone_id || "Europe/Berlin", lat: +d.latitude, lon: +d.longitude, created: +d.createtime, type: d.stationtype || "" };
+}
+async function loadRealtime() {
+  S.rt = await api("device/real_time", { call_back: "all" });
+  S.rtAt = Date.now();
+}
+async function loadDaily(progress) {
+  const today = localDate(Date.now()), yesterday = addDays(today, -1);
+  const have = [...S.daily.keys()].sort();
+  let start = have.length ? addDays(have[have.length - 1], -3) : localDate(S.info.created * 1000);
+  const first = localDate(S.info.created * 1000); if (start < first) start = first;
+  while (start <= yesterday) {
+    const end = addDays(start, 360) < yesterday ? addDays(start, 360) : yesterday;
+    progress && progress(`Tageswerte ${fmtD(start)} – ${fmtD(end)}`);
+    const data = await api("device/history", { start_date: start + " 00:00:00", end_date: end + " 23:59:59", cycle_type: "1day", call_back: CB_HIST });
+    for (const [k, r] of parseHist(data, true)) if (k < today) S.daily.set(k, r);
+    start = addDays(end, 1);
+  }
+}
+async function loadIntraday(which) {
+  const now = Date.now();
+  if (which !== "30") {
+    const d = await api("device/history", { start_date: apiDT(now - 24 * 3600e3), end_date: apiDT(now + 60e3), cycle_type: "5min", call_back: CB_HIST });
+    S.h5 = [...parseHist(d, false).values()].sort((a, b) => a.ts - b.ts);
+  }
+  if (which !== "5") {
+    const d = await api("device/history", { start_date: apiDT(now - 7 * 86400e3 + 60e3), end_date: apiDT(now + 60e3), cycle_type: "30min", call_back: CB_HIST });
+    S.h30 = [...parseHist(d, false).values()].sort((a, b) => a.ts - b.ts);
+  }
+}
+
+/* ---------------- Datenaufbereitung ---------------- */
+function todayRecord() {
+  if (!S.rt) return null;
+  const nowMs = S.rtAt || Date.now();
+  const today = localDate(nowMs);
+  const pts = S.h5.filter(p => localDate(p.ts) === today);
+  const g = k => pts.map(p => p[k]).filter(isNum);
+  const t = rv("outdoor", "temperature");
+  const add = (a, v) => isNum(v) ? a.concat([v]) : a;
+  const T = add(g("t"), t), H = add(g("h"), rv("outdoor", "humidity")), P = add(g("p"), rv("pressure", "relative"));
+  const TI = add(g("ti"), rv("indoor", "temperature"));
+  const r = {
+    d: today, partial: true,
+    t: mean(T), tx: maxOf(T), tn: minOf(T), td: mean(add(g("td"), rv("outdoor", "dew_point"))),
+    h: mean(H), hx: maxOf(H), hn: minOf(H),
+    sr: maxOf(add(g("sr"), rv("solar_and_uvi", "solar"))), uv: maxOf(add(g("uv"), rv("solar_and_uvi", "uvi"))),
+    rd: rv(rainGroup(), "daily"), rr: maxOf(add(g("rr"), rv(rainGroup(), "rain_rate"))),
+    ws: mean(add(g("ws"), rv("wind", "wind_speed"))), wg: maxOf(add(g("wg"), rv("wind", "wind_gust"))), wd: rv("wind", "wind_direction"),
+    p: mean(P), px: maxOf(P), pn: minOf(P),
+    ti: mean(TI), tix: maxOf(TI), tin: minOf(TI), hi: rv("indoor", "humidity")
+  };
+  const tsOf = (k, fn) => { let best = null; for (const p of pts) if (isNum(p[k]) && (best == null || fn(p[k], best[k]))) best = p; return best ? best.ts : null; };
+  r._txAt = tsOf("t", (a, b) => a > b); r._tnAt = tsOf("t", (a, b) => a < b);
+  if (isNum(t) && r.tx === t) r._txAt = nowMs; if (isNum(t) && r.tn === t && !r._tnAt) r._tnAt = nowMs;
+  return r;
+}
+/** Alle Tage für Statistiken: Einrichtungsphase raus, Ausreißer markiert, heute angehängt. */
+function allDays() {
+  const ignore = CONFIG.ignoreBefore || "";
+  const out = []; S.excluded = [];
+  for (const k of [...S.daily.keys()].sort()) {
+    if (k < ignore) continue;
+    const r = { ...S.daily.get(k) };
+    if (isNum(r.wg) && r.wg > (CONFIG.maxGust || 999)) { S.excluded.push({ d: k, what: "Böe", v: r.wg, unit: "km/h" }); if (S.outliers) r.wg = null; }
+    out.push(r);
+  }
+  const t = todayRecord();
+  if (t && (!out.length || out[out.length - 1].d < t.d)) out.push(t);
+  return out;
+}
+function rankList(days, get, dir) {
+  const arr = [];
+  for (const d of days) { const v = get(d); if (isNum(v)) arr.push([v, d]); }
+  arr.sort((a, b) => (dir === "max" ? b[0] - a[0] : a[0] - b[0]) || (a[1].d < b[1].d ? -1 : 1));
+  return arr;
+}
+function streak(days, pred) {
+  let best = { len: 0 }, cur = null, prev = null;
+  for (const d of days) {
+    const contiguous = prev && addDays(prev.d, 1) === d.d;
+    if (pred(d)) { if (cur && contiguous) { cur.len++; cur.end = d.d; } else cur = { len: 1, start: d.d, end: d.d, open: false }; if (cur.len > best.len) best = { ...cur }; }
+    else cur = null;
+    prev = d;
+  }
+  if (best.len && days.length && best.end === days[days.length - 1].d) best.open = true;
+  return best;
+}
+function monthAgg(days) {
+  const m = new Map();
+  for (const d of days) {
+    const k = d.d.slice(0, 7);
+    let o = m.get(k); if (!o) { o = { k, y: +k.slice(0, 4), m: +k.slice(5, 7), n: 0, t: [], tx: [], tn: [], r: 0, rDays: 0, wg: [], partial: false }; m.set(k, o); }
+    o.n++; if (d.partial) o.partial = true;
+    if (isNum(d.t)) o.t.push(d.t); if (isNum(d.tx)) o.tx.push(d.tx); if (isNum(d.tn)) o.tn.push(d.tn);
+    if (isNum(d.rd)) { o.r += d.rd; if (d.rd >= 1) o.rDays++; }
+    if (isNum(d.wg)) o.wg.push(d.wg);
+  }
+  for (const o of m.values()) {
+    o.dim = dim(o.y, o.m); o.complete = !o.partial && o.n >= o.dim - 1;
+    o.tMean = mean(o.t); o.txMax = maxOf(o.tx); o.tnMin = minOf(o.tn); o.wgMax = maxOf(o.wg);
+  }
+  return [...m.values()].sort((a, b) => a.k < b.k ? -1 : 1);
+}
+
+/* ---------------- Status & Banner ---------------- */
+function setStatus(state, text) { const p = $("st-pill"); p.dataset.state = state; $("st-text").textContent = text; }
+function banner(msg, kind) { const b = $("banner"); if (!msg) { b.hidden = true; return; } b.hidden = false; b.className = "banner" + (kind ? " " + kind : ""); b.innerHTML = msg; }
+function tickStatus() {
+  if (S.mode === "snap") { setStatus("snap", "Schnappschuss · " + (S.rtAt ? new Date(S.rtAt).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: TZ() }) : "")); return; }
+  if (S.loading) return;
+  const ts = S.rt && S.rt.outdoor && S.rt.outdoor.temperature ? +S.rt.outdoor.temperature.time * 1000 : 0;
+  if (S.lastError) { setStatus("error", "Keine Verbindung" + (ts ? " · Stand " + ago(ts) : "")); return; }
+  if (!ts) return;
+  const stat = S.mode === "static";
+  const stale = Date.now() - ts > (stat ? 75 : 15) * 60e3;
+  setStatus(stale ? "stale" : "live", (stale ? "Letzte Messung " : stat ? "Aktuell · Messung " : "Live · Messung ") + ago(ts));
+}
+
+/* ---------------- SVG-Bausteine ---------------- */
+function sparkline(svg, pts, key, color, gradientHeat) {
+  const vals = pts.filter(p => isNum(p[key]));
+  if (vals.length < 2) { svg.innerHTML = ""; return; }
+  const W = 300, H = 64, pad = 5;
+  const t0 = vals[0].ts, t1 = vals[vals.length - 1].ts;
+  let lo = Math.min(...vals.map(p => p[key])), hi = Math.max(...vals.map(p => p[key]));
+  if (hi - lo < 1) { const m = (hi + lo) / 2; lo = m - .5; hi = m + .5; }
+  const X = ts => (ts - t0) / (t1 - t0 || 1) * (W - 2 * pad) + pad, Y = v => H - pad - (v - lo) / (hi - lo) * (H - 2 * pad);
+  const d = vals.map((p, i) => (i ? "L" : "M") + X(p.ts).toFixed(1) + " " + Y(p[key]).toFixed(1)).join(" ");
+  const last = vals[vals.length - 1];
+  const id = svg.id + "-g";
+  let stops;
+  if (gradientHeat) { stops = [0, .25, .5, .75, 1].map(f => `<stop offset="${f}" stop-color="${heat(hi - f * (hi - lo))}"/>`).join(""); }
+  else stops = `<stop offset="0" stop-color="${color}"/><stop offset="1" stop-color="${color}"/>`;
+  svg.innerHTML = `<defs><linearGradient id="${id}" x1="0" y1="${pad}" x2="0" y2="${H - pad}" gradientUnits="userSpaceOnUse">${stops}</linearGradient>
+    <linearGradient id="${id}a" x1="0" y1="0" x2="0" y2="${H}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${gradientHeat ? heat(hi) : color}" stop-opacity=".28"/><stop offset="1" stop-color="${gradientHeat ? heat(lo) : color}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${d} L${X(t1).toFixed(1)} ${H} L${X(t0).toFixed(1)} ${H} Z" fill="url(#${id}a)"/>
+    <path d="${d}" fill="none" stroke="url(#${id})" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${X(last.ts)}" cy="${Y(last[key])}" r="3.5" fill="${gradientHeat ? heat(last[key]) : color}" stroke="${tok("--surface")}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+}
+function drawCompass(svg, deg, speed) {
+  const fg = tok("--fg"), mu = tok("--muted"), ln = tok("--line-2"), c = tok("--s7");
+  let ticks = "";
+  for (let i = 0; i < 16; i++) { const a = i * 22.5 * Math.PI / 180, r1 = i % 4 ? 41 : 38, r2 = 45; ticks += `<line x1="${50 + r1 * Math.sin(a)}" y1="${50 - r1 * Math.cos(a)}" x2="${50 + r2 * Math.sin(a)}" y2="${50 - r2 * Math.cos(a)}" stroke="${i % 4 ? ln : mu}" stroke-width="${i % 4 ? 1 : 1.6}"/>`; }
+  const lbl = [["N", 50, 27], ["O", 74, 53.5], ["S", 50, 80], ["W", 26, 53.5]].map(([t, x, y]) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="9" font-weight="600" fill="${t === "N" ? fg : mu}" font-family="Barlow, sans-serif">${t}</text>`).join("");
+  const has = isNum(deg);
+  svg.innerHTML = `<circle cx="50" cy="50" r="45" fill="none" stroke="${ln}" stroke-width="1"/>${ticks}${lbl}
+    ${has ? `<g transform="rotate(${deg} 50 50)" style="transition:transform .8s"><path d="M50 7 L56 19 L44 19 Z" fill="${c}"/><line x1="50" y1="19" x2="50" y2="${speed > 0.5 ? 66 : 50}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>${speed > 0.5 ? `<path d="M44 62 L50 72 L56 62" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>` : ""}</g>` : ""}
+    <circle cx="50" cy="50" r="3" fill="${fg}"/>`;
+}
+function trendHTML(delta, unit, per, dec = 1) {
+  if (!isNum(delta)) return "&nbsp;";
+  const up = delta > 0.05, down = delta < -0.05;
+  const rot = up ? -45 : down ? 45 : 0;
+  return `<svg width="16" height="16" viewBox="0 0 16 16" style="transform:rotate(${rot}deg)"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${delta > 0 ? "+" : ""}${fmt(delta, dec)} ${unit} ${per}</span>`;
+}
+
+/* ---------------- Sonnenstand (nach SunCalc) ---------------- */
+function sunTimes(ms, lat, lon) {
+  const rad = Math.PI / 180, J1970 = 2440588, J2000 = 2451545, e = rad * 23.4397;
+  const d = ms / 864e5 - .5 + J1970 - J2000, lw = rad * -lon, phi = rad * lat;
+  const n = Math.round(d - .0009 - lw / (2 * Math.PI)), ds = .0009 + lw / (2 * Math.PI) + n;
+  const M = rad * (357.5291 + .98560028 * ds);
+  const C = rad * (1.9148 * Math.sin(M) + .02 * Math.sin(2 * M) + .0003 * Math.sin(3 * M));
+  const L = M + C + rad * 102.9372 + Math.PI, dec = Math.asin(Math.sin(e) * Math.sin(L));
+  const Jnoon = J2000 + ds + .0053 * Math.sin(M) - .0069 * Math.sin(2 * L);
+  const w = Math.acos((Math.sin(rad * -.833) - Math.sin(phi) * Math.sin(dec)) / (Math.cos(phi) * Math.cos(dec)));
+  const Jset = J2000 + .0009 + (w + lw) / (2 * Math.PI) + n + .0053 * Math.sin(M) - .0069 * Math.sin(2 * L);
+  const Jrise = Jnoon - (Jset - Jnoon), toMs = j => (j + .5 - J1970) * 864e5;
+  return { rise: toMs(Jrise), set: toMs(Jset) };
+}
+
+/* ---------------- Rendering: Jetzt ---------------- */
+function renderNow() {
+  if (!S.rt) return;
+  const info = S.info || {};
+  $("st-name").textContent = info.name || "Wetterstation";
+  const firstDay = CONFIG.ignoreBefore && S.daily.size ? CONFIG.ignoreBefore : (info.created ? localDate(info.created * 1000) : null);
+  $("st-sub").textContent = ["Ecowitt-Wetterstation", firstDay ? "Daten seit " + fmtD(firstDay) : null, info.lat && !CONFIG.hideLocation ? `${fmt(info.lat, 2)}° N, ${fmt(info.lon, 2)}° O` : null].filter(Boolean).join(" · ");
+  const T = rv("outdoor", "temperature"), tr = todayRecord();
+  const ts = S.rt.outdoor && S.rt.outdoor.temperature ? +S.rt.outdoor.temperature.time * 1000 : S.rtAt;
+  $("now-t").textContent = fmt(T);
+  $("now-time").textContent = ts ? "Messung " + hhmm(ts) + " Uhr" : "";
+  $("hero").style.setProperty("--heat", heat(T));
+  $("now-fl").textContent = fmt(rv("outdoor", "feels_like")) + " °C";
+  const at = rv("outdoor", "app_temp"); $("now-fl2").textContent = isNum(at) ? "Apparent " + fmt(at) + " °C" : " ";
+  $("now-tx").textContent = fmt(tr && tr.tx) + " °C"; $("now-txt").textContent = tr && tr._txAt ? "um " + hhmm(tr._txAt) : " ";
+  $("now-tn").textContent = fmt(tr && tr.tn) + " °C"; $("now-tnt").textContent = tr && tr._tnAt ? "um " + hhmm(tr._tnAt) : " ";
+  // Trend über 1 Stunde
+  const h1 = S.h5.filter(p => isNum(p.t) && p.ts <= ts - 55 * 60e3 && p.ts >= ts - 75 * 60e3);
+  const ref = h1.length ? h1[h1.length - 1].t : null;
+  $("now-trend").innerHTML = isNum(ref) && isNum(T) ? trendHTML(T - ref, "°C", "in der letzten Stunde") : "&nbsp;";
+  sparkline($("spark-t"), S.h5, "t", null, true);
+  // Heatbar
+  const lo = -20, hi = 40, pos = v => clamp((v - lo) / (hi - lo) * 100, 0, 100);
+  $("heat-grad").style.background = heatGradientCSS(lo, hi);
+  $("heat-mark").style.left = pos(T) + "%";
+  if (tr && isNum(tr.tn) && isNum(tr.tx)) { $("heat-range").style.left = pos(tr.tn) + "%"; $("heat-range").style.width = Math.max(1, pos(tr.tx) - pos(tr.tn)) + "%"; }
+  $("heat-ticks").innerHTML = [-20, -10, 0, 10, 20, 30, 40].map(v => `<span style="left:${pos(v)}%">${String(v).replace("-", "−")}°</span>`).join("");
+
+  // Wind
+  const ws = rv("wind", "wind_speed"), wg = rv("wind", "wind_gust"), wd = rv("wind", "wind_direction"), wd10 = rv("wind", "10_minute_average_wind_direction");
+  const [bn, bname] = beaufort(isNum(ws) ? ws : 0);
+  $("w-speed").innerHTML = fmt(ws) + "<small>km/h</small>";
+  $("w-dir").textContent = isNum(wd) ? `aus ${compass(wd)} (${fmtInt(wd)}°)` : "–";
+  $("w-gust").textContent = "Böen " + fmt(wg) + " km/h";
+  $("w-bft").textContent = "Bft " + bn; $("w-bftname").textContent = bname;
+  $("w-gmax").textContent = fmt(tr && tr.wg) + " km/h";
+  $("w-dir10").textContent = isNum(wd10) ? compass(wd10) + " " + fmtInt(wd10) + "°" : "–";
+  drawCompass($("compass"), isNum(wd10) ? wd10 : wd, ws);
+
+  // Regen
+  const rg = rainGroup(), rr = rv(rg, "rain_rate");
+  $("r-day").innerHTML = fmt(rv(rg, "daily")) + "<small>mm heute</small>";
+  const ev = rv(rg, "event");
+  $("r-rate").textContent = `Rate ${fmt(rr)} mm/h` + (isNum(ev) && ev > 0 ? ` · Ereignis ${fmt(ev)} mm` : "");
+  $("r-state").hidden = !(isNum(rr) && rr > 0);
+  $("r-week").textContent = fmt(rv(rg, "weekly")); $("r-month").textContent = fmt(rv(rg, "monthly")); $("r-year").textContent = fmtInt(rv(rg, "yearly"));
+
+  // Druck
+  const P = rv("pressure", "relative");
+  $("p-rel").innerHTML = fmt(P) + "<small>hPa</small>";
+  $("p-abs").textContent = fmt(rv("pressure", "absolute"));
+  const p3 = S.h5.filter(p => isNum(p.p) && p.ts <= ts - 170 * 60e3 && p.ts >= ts - 200 * 60e3);
+  if (p3.length && isNum(P)) {
+    const dp = P - p3[p3.length - 1].p, a = Math.abs(dp);
+    const word = a < .5 ? "gleichbleibend" : (a < 2 ? "leicht " : a < 5 ? "" : "stark ") + (dp > 0 ? "steigend" : "fallend");
+    $("p-trend").innerHTML = trendHTML(dp, "hPa", "in 3 h") + `<span class="muted">· ${word}</span>`;
+  } else $("p-trend").innerHTML = "&nbsp;";
+  const p24 = S.h5.map(p => p.p).filter(isNum);
+  $("p-max").textContent = fmt(maxOf(p24)); $("p-min").textContent = fmt(minOf(p24));
+  sparkline($("spark-p"), S.h5, "p", tok("--s6"), false);
+
+  // Feuchte
+  const H = rv("outdoor", "humidity"), TD = rv("outdoor", "dew_point");
+  $("h-out").innerHTML = fmtInt(H) + "<small>%</small>"; $("h-bar").style.width = clamp(H || 0, 0, 100) + "%";
+  $("h-dew").textContent = fmt(TD) + " °C";
+  const spread = isNum(T) && isNum(TD) ? T - TD : null;
+  $("h-spread").textContent = fmt(spread) + " K";
+  $("h-hint").textContent = !isNum(spread) ? " " : spread < 1 ? "Nebel oder Nässe wahrscheinlich" : spread < 3 ? "feucht, Taubildung möglich" : H < 30 ? "sehr trockene Luft" : "angenehm";
+  $("h-min").textContent = fmtInt(tr && tr.hn) + " %";
+
+  // Sonne
+  const SR = rv("solar_and_uvi", "solar"), UV = rv("solar_and_uvi", "uvi");
+  $("s-rad").innerHTML = fmtInt(SR) + "<small>W/m²</small>";
+  const [, uvName, uvCol] = uvInfo(isNum(UV) ? UV : 0);
+  const chip = $("uv-chip"); chip.textContent = `UV ${isNum(UV) ? fmtInt(UV) : "–"} · ${uvName}`; chip.style.setProperty("--c", uvCol);
+  $("s-max").textContent = "Heute max " + fmtInt(tr && tr.sr) + " W/m² · UV " + fmtInt(tr && tr.uv);
+  if (isNum(info.lat) && isNum(info.lon)) {
+    const noon = Date.parse(localDate(Date.now()) + "T12:00:00Z");
+    const st = sunTimes(noon, info.lat, info.lon);
+    $("s-rise").textContent = hhmm(st.rise); $("s-set").textContent = hhmm(st.set);
+    const mins = Math.round((st.set - st.rise) / 60e3); $("s-len").textContent = `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")}`;
+  }
+  // Innen
+  $("i-t").innerHTML = fmt(rv("indoor", "temperature")) + "<small>°C</small>";
+  $("i-h").textContent = fmtInt(rv("indoor", "humidity")) + " % Luftfeuchte";
+  $("i-dew").textContent = fmt(rv("indoor", "dew_point")) + " °C";
+  $("i-max").textContent = fmt(tr && tr.tix) + " °C"; $("i-min").textContent = fmt(tr && tr.tin) + " °C";
+
+  renderExtra();
+}
+function renderExtra() {
+  const known = new Set(["outdoor", "indoor", "solar_and_uvi", "rainfall", "rainfall_piezo", "wind", "pressure", "battery"]);
+  const NAMES = { temp_and_humidity_ch: "Thermo-Hygro Kanal ", soil_ch: "Bodenfeuchte Kanal ", pm25_ch: "Feinstaub Kanal ", temp_ch: "Temperatur Kanal ", leaf_ch: "Blattnässe Kanal ", lightning: "Blitzdetektor", indoor_co2: "CO₂ innen", co2_aqi_combo: "Luftqualität", water_leak: "Wassermelder" };
+  const FN = { temperature: "Temperatur", humidity: "Feuchte", soilmoisture: "Bodenfeuchte", pm25: "PM2.5", real_time_aqi: "AQI", "24_hours_aqi": "AQI 24 h", distance: "Entfernung", count: "Blitze", co2: "CO₂", leafwetness: "Blattnässe" };
+  let html = "";
+  for (const [g, fields] of Object.entries(S.rt || {})) {
+    if (known.has(g) || !fields || typeof fields !== "object") continue;
+    let name = g; for (const [p, n] of Object.entries(NAMES)) if (g.startsWith(p)) { name = n + g.slice(p.length); break; }
+    const rows = Object.entries(fields).filter(([, x]) => x && x.value !== undefined).map(([f, x]) => `<div class="kv"><span class="lbl">${esc(FN[f] || f)}</span><b class="num">${esc(String(x.value).replace(".", ","))} <small>${esc(x.unit || "")}</small></b></div>`).join("");
+    if (rows) html += `<article class="card tile"><div class="tile-h"><span class="eyebrow">${esc(name)}</span></div><div style="display:flex;gap:16px;flex-wrap:wrap">${rows}</div></article>`;
+  }
+  $("extra").innerHTML = html;
+}
+
+/* ---------------- Rendering: Heute im Vergleich ---------------- */
+function renderCompare() {
+  const days = allDays(); const tr = days.length && days[days.length - 1].partial ? days[days.length - 1] : null;
+  if (!tr) { $("compare").innerHTML = ""; return; }
+  const past = days.filter(d => !d.partial);
+  const mon = +tr.d.slice(5, 7);
+  const items = [
+    { k: "tx", label: "Höchstwert heute", unit: "°C", hi: "wärmster", lo: "kühlster", vHi: "wärmer als", vLo: "kühler als", c: heat(tr.tx) },
+    { k: "tn", label: "Tiefstwert heute", unit: "°C", hi: "mildester", lo: "kältester", vHi: "milder als", vLo: "kälter als", c: heat(tr.tn) },
+    { k: "rd", label: "Regen heute", unit: "mm", hi: "nassester", vHi: "nasser als", only: "max", c: tok("--s1") },
+    { k: "wg", label: "Stärkste Böe heute", unit: "km/h", hi: "windigster", vHi: "böiger als", only: "max", c: tok("--s7") }
+  ];
+  let html = "";
+  for (const it of items) {
+    const v = tr[it.k]; if (!isNum(v)) continue;
+    const all = past.map(d => d[it.k]).filter(isNum), inMon = past.filter(d => +d.d.slice(5, 7) === mon).map(d => d[it.k]).filter(isNum);
+    if (!all.length) continue;
+    if (it.only === "max" && v <= 0) { html += `<article class="card cmp" style="--c:${it.c}"><div class="rank">–<small>trocken</small></div><div class="t1">${it.label}: ${fmt(v)} ${it.unit}</div><div class="t2">Bisher nichts gemessen.</div></article>`; continue; }
+    const above = all.filter(x => x > v).length, below = all.filter(x => x < v).length;
+    const useHi = it.only === "max" || above <= below;
+    const rank = (useHi ? above : below) + 1;
+    const rankM = (useHi ? inMon.filter(x => x > v).length : inMon.filter(x => x < v).length) + 1;
+    const word = useHi ? it.hi : it.lo, verb = useHi ? it.vHi : it.vLo, mName = MONTHS[mon - 1];
+    const pctAll = Math.round((useHi ? below : above) / all.length * 100);
+    const pctMon = inMon.length ? Math.round((useHi ? inMon.filter(x => x < v).length : inMon.filter(x => x > v).length) / inMon.length * 100) : null;
+    let big, small, t2;
+    if (rank <= 15) { big = rank + "."; small = "Platz"; t2 = `${rank}. ${word} Tag von ${fmtInt(all.length + 1)} · im ${mName}: Platz ${rankM} von ${inMon.length + 1}`; }
+    else if (rankM <= 5 && inMon.length >= 20) { big = rankM + "."; small = "im " + MON3[mon - 1]; t2 = `${rankM}. ${word} ${mName}-Tag von ${inMon.length + 1} · ${verb} ${pctAll} % aller Tage`; }
+    else { big = pctAll + " %"; small = useHi ? "übertroffen" : "unterboten"; t2 = `${verb[0].toUpperCase() + verb.slice(1)} ${pctAll} % aller Tage` + (pctMon != null ? ` · im ${mName}: ${verb} ${pctMon} %` : ""); }
+    html += `<article class="card cmp" style="--c:${it.c}"><div class="rank num">${big}<small>${small}</small></div>
+      <div class="t1">${it.label}: ${fmt(v)} ${it.unit}</div>
+      <div class="t2">${t2}</div></article>`;
+  }
+  $("compare").innerHTML = html;
+  $("cmp-n").textContent = "gemessen an allen Tagen seit " + fmtD(past[0] && past[0].d);
+}
+
+/* ---------------- ECharts-Grundlagen ---------------- */
+const CH = {};
+function chart(id) {
+  const el = $(id); if (!el || !window.echarts) return null;
+  if (!CH[id]) { CH[id] = echarts.init(el, null, { renderer: "canvas" }); new ResizeObserver(() => CH[id] && CH[id].resize()).observe(el); }
+  return CH[id];
+}
+function base(extra = {}) {
+  return Object.assign({
+    animation: !REDUCED, animationDuration: 500,
+    textStyle: { fontFamily: "Barlow, system-ui, sans-serif", color: tok("--fg-2") },
+    grid: { left: 46, right: 16, top: 18, bottom: 28, containLabel: false },
+    tooltip: { trigger: "axis", confine: true, backgroundColor: tok("--surface-2"), borderColor: tok("--line-2"), borderWidth: 1, padding: [8, 10], textStyle: { color: tok("--fg"), fontSize: 13, fontFamily: "Barlow, system-ui, sans-serif" }, axisPointer: { type: "line", lineStyle: { color: tok("--muted"), width: 1 } }, extraCssText: "border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25)" }
+  }, extra);
+}
+function ax(extra = {}) {
+  const o = Object.assign({ axisLine: { lineStyle: { color: tok("--line-2") } }, axisTick: { show: false }, axisLabel: { color: tok("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: tok("--line") } } }, extra);
+  if (o.type === "value" && !(o.axisLabel && o.axisLabel.formatter)) o.axisLabel = Object.assign({}, o.axisLabel, { formatter: v => fmtAx(v) });
+  return o;
+}
+const dot = c => `<span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${c};margin-right:6px"></span>`;
+function tipTime(ms) { const p = parts(ms); return `${wday(`${p.year}-${p.month}-${p.day}`)} ${p.day}.${p.month}. ${p.hour}:${p.minute}`; }
+
+/* ---------------- Rendering: Verlauf ---------------- */
+function renderHistory() {
+  const pts = S.range === "24h" ? S.h5 : S.h30;
+  $("hist-sub").textContent = S.range === "24h" ? "Letzte 24 Stunden in 5-Minuten-Werten." : "Letzte 7 Tage in 30-Minuten-Werten.";
+  if (!pts.length) return;
+  const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts;
+  const xAx = ax({ type: "time", min: t0, max: t1, splitLine: { show: false }, axisLabel: { color: tok("--muted"), fontSize: 11, hideOverlap: true, formatter: S.range === "24h" ? "{HH}:{mm}" : { day: "{dd}.{MM}.", hour: "{HH}:{mm}" } } });
+  const series = k => pts.filter(p => isNum(p[k])).map(p => [p.ts, p[k]]);
+  const fmtTip = (units, decs) => ps => { if (!ps.length) return ""; return `<b>${tipTime(ps[0].value[0])}</b><br>` + ps.map(p => `${dot(p.color && p.color.colorStops ? heat(p.value[1]) : (typeof p.color === "string" ? p.color : tok("--accent")))}${p.seriesName}: <b>${fmt(p.value[1], decs[p.seriesIndex] ?? 1)}</b> ${units[p.seriesIndex] || units[0]}`).join("<br>"); };
+  const lg = names => ({ show: true, top: 0, right: 8, itemWidth: 14, itemHeight: 8, textStyle: { color: tok("--fg-2"), fontSize: 12 }, data: names });
+
+  // Temperatur
+  const T = series("t"), TD = series("td");
+  const tv = T.map(x => x[1]).concat(TD.map(x => x[1]));
+  $("cv-temp").textContent = T.length ? `${fmt(minOf(T.map(x => x[1])))} bis ${fmt(maxOf(T.map(x => x[1])))} °C` : "";
+  chart("ch-temp").setOption(base({
+    grid: { left: 40, right: 16, top: 36, bottom: 28 },
+    legend: lg(["Temperatur", "Taupunkt"]),
+    tooltip: { ...base().tooltip, formatter: fmtTip(["°C"], [1, 1]) },
+    xAxis: xAx, yAxis: ax({ type: "value", scale: true, axisLabel: { color: tok("--muted"), fontSize: 11, formatter: v => fmtAx(v, "°") } }),
+    visualMap: { show: false, type: "continuous", seriesIndex: 0, dimension: 1, min: -20, max: 40, inRange: { color: HEAT.map(s => s[1]) } },
+    series: [
+      { name: "Temperatur", type: "line", data: T, showSymbol: false, lineStyle: { width: 2.5 }, itemStyle: { color: heat(T.length ? T[T.length - 1][1] : 10) }, emphasis: { disabled: true },
+        markPoint: T.length ? { symbol: "circle", symbolSize: 8, label: { show: true, position: "top", color: tok("--fg"), fontSize: 11, formatter: p => fmt(p.value) + "°" }, itemStyle: { borderColor: tok("--surface"), borderWidth: 2 }, data: [{ type: "max" }, { type: "min", label: { position: "bottom" } }] } : undefined },
+      { name: "Taupunkt", type: "line", data: TD, showSymbol: false, lineStyle: { width: 1.5, color: tok("--s3") }, itemStyle: { color: tok("--s3") }, emphasis: { disabled: true } }
+    ]
+  }), true);
+
+  // Regen pro Intervall aus der Tagessumme
+  const rain = []; let prev = null;
+  for (const p of pts) { if (!isNum(p.rd)) continue; let d = prev == null ? 0 : p.rd - prev; if (d < 0) d = p.rd; rain.push([p.ts, Math.round(Math.max(0, d) * 10) / 10]); prev = p.rd; }
+  const rsum = sum(rain.map(x => x[1]));
+  $("cv-rain").textContent = `Summe ${fmt(rsum)} mm`;
+  chart("ch-rain").setOption(base({
+    grid: { left: 56, right: 16, top: 18, bottom: 28 },
+    tooltip: { ...base().tooltip, formatter: ps => `<b>${tipTime(ps[0].value[0])}</b><br>${dot(tok("--s1"))}Niederschlag: <b>${fmt(ps[0].value[1])}</b> mm in ${S.range === "24h" ? "5" : "30"} Min.` },
+    xAxis: xAx, yAxis: ax({ type: "value", min: 0, max: v => Math.max(1, Math.ceil(v.max)), axisLabel: { color: tok("--muted"), fontSize: 11, formatter: v => fmtAx(v, " mm") } }),
+    series: [{ name: "Niederschlag", type: "bar", data: rain, barMaxWidth: 6, itemStyle: { color: tok("--s1"), borderRadius: [3, 3, 0, 0] } }]
+  }), true);
+
+  // Wind
+  const WS = series("ws"), WG = series("wg");
+  $("cv-wind").textContent = WG.length ? `max. Böe ${fmt(maxOf(WG.map(x => x[1])))} km/h` : "";
+  chart("ch-wind").setOption(base({
+    grid: { left: 46, right: 16, top: 30, bottom: 28 }, legend: lg(["Wind", "Böen"]),
+    tooltip: { ...base().tooltip, formatter: fmtTip(["km/h", "km/h"], [1, 1]) },
+    xAxis: xAx, yAxis: ax({ type: "value", min: 0, axisLabel: { color: tok("--muted"), fontSize: 11 } }),
+    series: [
+      { name: "Wind", type: "line", data: WS, showSymbol: false, lineStyle: { width: 2, color: tok("--s7") }, itemStyle: { color: tok("--s7") }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: tok("--s7") + "66" }, { offset: 1, color: tok("--s7") + "05" }]) } },
+      { name: "Böen", type: "line", data: WG, showSymbol: false, lineStyle: { width: 1.2, color: tok("--s5") }, itemStyle: { color: tok("--s5") } }
+    ]
+  }), true);
+
+  // Druck
+  const P = series("p");
+  $("cv-press").textContent = P.length ? `${fmt(minOf(P.map(x => x[1])))} – ${fmt(maxOf(P.map(x => x[1])))} hPa` : "";
+  chart("ch-press").setOption(base({
+    grid: { left: 52, right: 16, top: 18, bottom: 28 },
+    tooltip: { ...base().tooltip, formatter: fmtTip(["hPa"], [1]) },
+    xAxis: xAx, yAxis: ax({ type: "value", scale: true, axisLabel: { color: tok("--muted"), fontSize: 11 } }),
+    series: [{ name: "Luftdruck", type: "line", data: P, showSymbol: false, lineStyle: { width: 2, color: tok("--s6") }, itemStyle: { color: tok("--s6") }, areaStyle: { origin: "start", color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: tok("--s6") + "40" }, { offset: 1, color: tok("--s6") + "00" }]) } }]
+  }), true);
+
+  // Feuchte
+  const H = series("h");
+  $("cv-hum").textContent = H.length ? `${fmtInt(minOf(H.map(x => x[1])))} – ${fmtInt(maxOf(H.map(x => x[1])))} %` : "";
+  chart("ch-hum").setOption(base({
+    tooltip: { ...base().tooltip, formatter: fmtTip(["%"], [0]) },
+    xAxis: xAx, yAxis: ax({ type: "value", min: 0, max: 100, interval: 25, axisLabel: { color: tok("--muted"), fontSize: 11, formatter: v => fmtAx(v, " %") } }),
+    series: [{ name: "Luftfeuchte", type: "line", data: H, showSymbol: false, lineStyle: { width: 2, color: tok("--s3") }, itemStyle: { color: tok("--s3") }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: tok("--s3") + "55" }, { offset: 1, color: tok("--s3") + "05" }]) } }]
+  }), true);
+
+  // Sonne
+  const SR = series("sr");
+  $("cv-sun").textContent = SR.length ? `max. ${fmtInt(maxOf(SR.map(x => x[1])))} W/m²` : "";
+  chart("ch-sun").setOption(base({
+    grid: { left: 50, right: 16, top: 18, bottom: 28 },
+    tooltip: { ...base().tooltip, formatter: fmtTip(["W/m²"], [0]) },
+    xAxis: xAx, yAxis: ax({ type: "value", min: 0, max: v => Math.max(100, Math.ceil(v.max / 100) * 100), axisLabel: { color: tok("--muted"), fontSize: 11 } }),
+    series: [{ name: "Strahlung", type: "line", data: SR, showSymbol: false, lineStyle: { width: 2, color: tok("--s4") }, itemStyle: { color: tok("--s4") }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: tok("--s4") + "88" }, { offset: 1, color: tok("--s4") + "08" }]) } }]
+  }), true);
+
+  ["ch-temp", "ch-rain", "ch-wind", "ch-press", "ch-hum", "ch-sun"].forEach(id => { if (CH[id]) CH[id].group = "hist"; });
+  echarts.connect("hist");
+}
+
+/* ---------------- Rendering: Rekorde ---------------- */
+const REC = [
+  { grp: "Temperatur", items: [
+    { label: "Höchsttemperatur", k: "tx", dir: "max", u: "°C", c: v => heat(v) },
+    { label: "Tiefsttemperatur", k: "tn", dir: "min", u: "°C", c: v => heat(v) },
+    { label: "Wärmste Nacht", sub: "höchstes Tagesminimum", k: "tn", dir: "max", u: "°C", c: v => heat(v) },
+    { label: "Kältester Tag", sub: "niedrigstes Tagesmaximum", k: "tx", dir: "min", u: "°C", c: v => heat(v) },
+    { label: "Wärmstes Tagesmittel", k: "t", dir: "max", u: "°C", c: v => heat(v) },
+    { label: "Kältestes Tagesmittel", k: "t", dir: "min", u: "°C", c: v => heat(v) },
+    { label: "Größte Tagesschwankung", sub: "Max minus Min", get: d => isNum(d.tx) && isNum(d.tn) ? d.tx - d.tn : null, dir: "max", u: "K", c: () => tok("--s2") },
+    { label: "Schwülster Tag", sub: "höchster mittlerer Taupunkt", k: "td", dir: "max", u: "°C", c: () => tok("--s3") }
+  ] },
+  { grp: "Niederschlag & Feuchte", items: [
+    { label: "Nassester Tag", k: "rd", dir: "max", u: "mm", c: () => tok("--s1") },
+    { label: "Heftigster Regen", sub: "höchste Regenrate", k: "rr", dir: "max", u: "mm/h", c: () => tok("--s1") },
+    { label: "Trockenste Luft", sub: "niedrigste Luftfeuchte", k: "hn", dir: "min", u: "%", dec: 0, c: () => tok("--s4") }
+  ] },
+  { grp: "Wind & Luftdruck", items: [
+    { label: "Stärkste Böe", k: "wg", dir: "max", u: "km/h", c: () => tok("--s7"), extra: v => "Bft " + beaufort(v)[0] + " · " + beaufort(v)[1] },
+    { label: "Windigster Tag", sub: "höchstes Tagesmittel", k: "ws", dir: "max", u: "km/h", c: () => tok("--s7") },
+    { label: "Höchster Luftdruck", k: "px", dir: "max", u: "hPa", c: () => tok("--s6") },
+    { label: "Tiefster Luftdruck", k: "pn", dir: "min", u: "hPa", c: () => tok("--s6") }
+  ] },
+  { grp: "Sonne", items: [
+    { label: "Stärkste Sonnenstrahlung", k: "sr", dir: "max", u: "W/m²", dec: 0, c: () => tok("--s4") },
+    { label: "Höchster UV-Index", k: "uv", dir: "max", u: "", dec: 0, c: v => uvInfo(v)[2], extra: v => uvInfo(v)[1] }
+  ] },
+  { grp: "Innen", items: [
+    { label: "Wärmste Innentemperatur", k: "tix", dir: "max", u: "°C", c: v => heat(v) },
+    { label: "Kälteste Innentemperatur", k: "tin", dir: "min", u: "°C", c: v => heat(v) }
+  ] }
+];
+function recCard(days, it) {
+  const get = it.get || (d => d[it.k]);
+  const list = rankList(days, get, it.dir); if (!list.length) return "";
+  const dec = it.dec ?? 1, top = list[0], ties = list.filter(x => x[0] === top[0]).length;
+  const c = it.c(top[0]);
+  const others = []; for (const x of list.slice(1)) { if (others.length >= 2) break; others.push(x); }
+  const isNew = top[1].partial;
+  return `<article class="card rec" style="--c:${c}">
+    ${isNew ? `<span class="chip new" style="--c:var(--s8)"><i></i>heute!</span>` : ""}
+    <div class="rl">${it.label}${it.sub ? ` <small>· ${it.sub}</small>` : ""}</div>
+    <div class="rv num">${fmt(top[0], dec)}<small>${it.u}</small></div>
+    <div class="rd"><span>${wday(top[1].d)}, ${fmtD(top[1].d)}</span>${ties > 1 ? `<span class="muted">· an ${ties} Tagen erreicht</span>` : ""}</div>${it.extra ? `<div class="muted" style="font-size:.8rem">${it.extra(top[0])}</div>` : ""}
+    <ol>${others.map((x, i) => `<li><span>${i + 2}. ${fmtD(x[1].d)}</span><b class="num">${fmt(x[0], dec)} ${it.u}</b></li>`).join("")}</ol>
+  </article>`;
+}
+function serCard(label, sub, s, c, unitWord = "Tage") {
+  if (!s || !s.len) return `<article class="card rec" style="--c:${c}"><div class="rl">${label} <small>· ${sub}</small></div><div class="rv num">0<small>${unitWord}</small></div><div class="rd muted">noch nicht aufgetreten</div></article>`;
+  return `<article class="card rec" style="--c:${c}">${s.open ? `<span class="chip new" style="--c:var(--s8)"><i></i>läuft</span>` : ""}<div class="rl">${label} <small>· ${sub}</small></div><div class="rv num">${s.len}<small>${s.len === 1 ? "Tag" : unitWord}</small></div><div class="rd">${fmtD(s.start)} – ${fmtD(s.end)}</div></article>`;
+}
+function monCard(label, list, get, dir, u, dec, c) {
+  const l = list.filter(m => m.complete && isNum(get(m))).sort((a, b) => dir === "max" ? get(b) - get(a) : get(a) - get(b));
+  if (!l.length) return "";
+  const top = l[0];
+  return `<article class="card rec" style="--c:${c(get(top))}"><div class="rl">${label} <small>· nur vollständige Monate</small></div><div class="rv num">${fmt(get(top), dec)}<small>${u}</small></div><div class="rd">${MONTHS[top.m - 1]} ${top.y}</div>
+    <ol>${l.slice(1, 3).map((m, i) => `<li><span>${i + 2}. ${MON3[m.m - 1]} ${m.y}</span><b class="num">${fmt(get(m), dec)} ${u}</b></li>`).join("")}</ol></article>`;
+}
+function renderRecords() {
+  const all = allDays(); if (!all.length) return;
+  const years = [...new Set(all.map(d => +d.d.slice(0, 4)))];
+  const seg = $("seg-rec");
+  seg.innerHTML = [`<button data-v="all" aria-pressed="${S.recScope === "all"}">Gesamt</button>`].concat(years.slice().reverse().map(y => `<button data-v="${y}" aria-pressed="${S.recScope === String(y)}">${y}</button>`)).join("");
+  const days = S.recScope === "all" ? all : all.filter(d => d.d.startsWith(S.recScope));
+  if (!days.length) { $("rec-wrap").innerHTML = ""; return; }
+  $("rec-sub").textContent = `${S.recScope === "all" ? "Alle" : "Die"} Extremwerte ${S.recScope === "all" ? "seit Messbeginn" : "im Jahr " + S.recScope}: ${fmtInt(days.length)} Messtage vom ${fmtD(days[0].d)} bis ${fmtD(days[days.length - 1].d)}.`;
+  let html = "";
+  for (const g of REC) {
+    const cards = g.items.map(it => recCard(days, it)).join("");
+    if (cards) html += `<div class="rec-group-title"><h3>${g.grp}</h3><span class="ln"></span></div><div class="rec-grid">${cards}</div>`;
+  }
+  const hotC = heat(32), frostC = heat(-8);
+  html += `<div class="rec-group-title"><h3>Serien</h3><span class="ln"></span></div><div class="rec-grid">
+    ${serCard("Längste Trockenphase", "Tage unter 0,1 mm", streak(days, d => isNum(d.rd) && d.rd < .1), tok("--s4"))}
+    ${serCard("Längste Regenserie", "Tage ab 1 mm", streak(days, d => isNum(d.rd) && d.rd >= 1), tok("--s1"))}
+    ${serCard("Längste Hitzewelle", "Tage ab 30 °C", streak(days, d => isNum(d.tx) && d.tx >= 30), hotC)}
+    ${serCard("Längste Sommerserie", "Tage ab 25 °C", streak(days, d => isNum(d.tx) && d.tx >= 25), heat(26))}
+    ${serCard("Längste Frostperiode", "Tiefstwert unter 0 °C", streak(days, d => isNum(d.tn) && d.tn < 0), frostC)}
+    ${serCard("Längster Dauerfrost", "Höchstwert unter 0 °C", streak(days, d => isNum(d.tx) && d.tx < 0), heat(-14))}
+  </div>`;
+  const mons = monthAgg(days);
+  const mcards = [
+    monCard("Wärmster Monat", mons, m => m.tMean, "max", "°C", 1, v => heat(v)),
+    monCard("Kältester Monat", mons, m => m.tMean, "min", "°C", 1, v => heat(v)),
+    monCard("Nassester Monat", mons, m => m.r, "max", "mm", 1, () => tok("--s1")),
+    monCard("Trockenster Monat", mons, m => m.r, "min", "mm", 1, () => tok("--s4"))
+  ].join("");
+  if (mcards) html += `<div class="rec-group-title"><h3>Monate</h3><span class="ln"></span></div><div class="rec-grid">${mcards}</div>`;
+  $("rec-wrap").innerHTML = html;
+  const ex = S.excluded;
+  const notes = [];
+  if (CONFIG.ignoreBefore && S.daily.size && [...S.daily.keys()].some(k => k < CONFIG.ignoreBefore)) notes.push(`Tage vor dem ${fmtD(CONFIG.ignoreBefore)} sind ausgeblendet (Einrichtungsphase: der Außensensor maß noch Innenwerte).`);
+  if (ex.length) notes.push(`${S.outliers ? "Ausgeblendet" : "Einbezogen"} ${ex.length === 1 ? "ist ein verdächtiger Wert" : `sind ${ex.length} verdächtige Werte`} über ${CONFIG.maxGust} km/h: ${ex.map(e => `${e.what} ${fmt(e.v)} ${e.unit} am ${fmtD(e.d)}`).join(", ")}.`);
+  notes.push("Tagesrekorde stammen aus den Tageshöchst- und -tiefstwerten der Ecowitt-Cloud. Der heutige Tag zählt bereits mit.");
+  $("rec-note").textContent = notes.join(" ");
+}
+
+/* ---------------- Rendering: Jahresgang ---------------- */
+function renderYear() {
+  const all = allDays(); if (!all.length) return;
+  const years = [...new Set(all.map(d => +d.d.slice(0, 4)))];
+  if (!S.year || !years.includes(S.year)) S.year = years[years.length - 1];
+  $("seg-year").innerHTML = years.slice().reverse().map(y => `<button data-v="${y}" aria-pressed="${S.year === y}">${y}</button>`).join("");
+  const N = MMDD.length;
+  const env = Array.from({ length: N }, () => ({ hi: null, hiY: null, lo: null, loY: null, tx: [], tn: [] }));
+  for (const d of all) {
+    const i = doyIdx.get(d.d.slice(5)); if (i == null) continue; const e = env[i];
+    if (isNum(d.tx)) { e.tx.push(d.tx); if (e.hi == null || d.tx > e.hi) { e.hi = d.tx; e.hiY = d.d.slice(0, 4); } }
+    if (isNum(d.tn)) { e.tn.push(d.tn); if (e.lo == null || d.tn < e.lo) { e.lo = d.tn; e.loY = d.d.slice(0, 4); } }
+  }
+  const smooth = (arr, w = 7) => arr.map((_, i) => { const v = []; for (let j = i - w; j <= i + w; j++) { const x = arr[(j + N) % N]; if (isNum(x)) v.push(x); } return v.length ? Math.round(mean(v) * 10) / 10 : null; });
+  const avgTx = smooth(env.map(e => mean(e.tx))), avgTn = smooth(env.map(e => mean(e.tn)));
+  const yd = new Map(all.filter(d => d.d.startsWith(String(S.year))).map(d => [doyIdx.get(d.d.slice(5)), d]));
+  const envColor = isDark() ? "rgba(160,180,215,.16)" : "rgba(60,80,120,.13)";
+  $("lg-env").style.background = envColor; $("lg-avg").style.background = tok("--muted"); $("lg-heat").style.background = heatGradientCSS(-10, 35);
+  const rectSeries = (name, data, colorFn, wFactor, z) => ({
+    name, type: "custom", z, data, encode: { x: 0, y: [1, 2] },
+    renderItem: (params, api) => {
+      const x = api.value(0), lo = api.value(1), hi = api.value(2); if (!isNum(lo) || !isNum(hi)) return;
+      const a = api.coord([x, hi]), b = api.coord([x, lo]); const bw = api.size([1, 0])[0];
+      const w = Math.max(1, bw * wFactor);
+      return { type: "rect", shape: { x: a[0] - w / 2, y: a[1], width: w, height: Math.max(1.5, b[1] - a[1]), r: wFactor < 1 ? Math.min(2, w / 2) : 0 }, style: { fill: colorFn(params.dataIndex, api) } };
+    }
+  });
+  const envData = env.map((e, i) => [i, e.lo, e.hi]);
+  const yrData = MMDD.map((_, i) => { const d = yd.get(i); return d ? [i, d.tn, d.tx, isNum(d.t) ? d.t : (d.tn + d.tx) / 2] : [i, null, null, null]; });
+  const c = chart("ch-year");
+  c.setOption(base({
+    grid: { left: 44, right: 16, top: 16, bottom: 30 },
+    tooltip: { ...base().tooltip, formatter: ps => {
+      const i = ps[0].dataIndex, e = env[i], d = yd.get(i), md = MMDD[i];
+      let s = `<b>${md.slice(3)}.${md.slice(0, 2)}.${S.year}</b>`;
+      if (d) s += `<br>${dot(heat(d.t))}${fmt(d.tn)} bis ${fmt(d.tx)} °C · Mittel ${fmt(d.t)} °C` + (isNum(d.rd) && d.rd > 0 ? `<br>${dot(tok("--s1"))}Regen ${fmt(d.rd)} mm` : "");
+      else s += `<br><span style="color:${tok("--muted")}">keine Daten</span>`;
+      if (e.hi != null) s += `<br><span style="color:${tok("--muted")}">Rekord für diesen Tag: ${fmt(e.lo)} °C (${e.loY}) bis ${fmt(e.hi)} °C (${e.hiY})</span>`;
+      return s;
+    } },
+    xAxis: ax({ type: "category", data: MMDD, boundaryGap: true, splitLine: { show: false }, axisLabel: { color: tok("--muted"), fontSize: 11, interval: i => MMDD[i].endsWith("-01"), formatter: v => MON3[+v.slice(0, 2) - 1] } }),
+    yAxis: ax({ type: "value", scale: true, axisLabel: { color: tok("--muted"), fontSize: 11, formatter: v => fmtAx(v, "°") } }),
+    series: [
+      rectSeries("Rekordbereich", envData, () => envColor, 1.02, 1),
+      { name: "Ø Max", type: "line", data: avgTx, showSymbol: false, smooth: true, lineStyle: { width: 1, color: tok("--muted"), opacity: .8 }, z: 2, silent: true },
+      { name: "Ø Min", type: "line", data: avgTn, showSymbol: false, smooth: true, lineStyle: { width: 1, color: tok("--muted"), opacity: .8 }, z: 2, silent: true },
+      rectSeries(String(S.year), yrData, i => heat(yrData[i][3]), .62, 3)
+    ]
+  }), true);
+}
+
+/* ---------------- Rendering: Kalender ---------------- */
+const CAL = {
+  t: { label: "Tagesmittel", u: "°C", type: "heat", get: d => d.t },
+  tx: { label: "Höchstwert", u: "°C", type: "heat", get: d => d.tx },
+  tn: { label: "Tiefstwert", u: "°C", type: "heat", get: d => d.tn },
+  rd: { label: "Regen", u: "mm", type: "rain", get: d => d.rd },
+  wg: { label: "Böen", u: "km/h", type: "wind", get: d => d.wg },
+  sr: { label: "Sonne", u: "W/m²", type: "sun", get: d => d.sr }
+};
+function renderCalendar() {
+  const all = allDays(); if (!all.length) return;
+  $("seg-cal").innerHTML = Object.entries(CAL).map(([k, v]) => `<button data-v="${k}" aria-pressed="${S.cal === k}">${v.label}</button>`).join("");
+  const m = CAL[S.cal];
+  $("cal-sub").textContent = `Jeder Tag seit Messbeginn als farbiges Kästchen: ${m.label} in ${m.u}. Zeilen sind Wochentage, Spalten Kalenderwochen.`;
+  const years = [...new Set(all.map(d => +d.d.slice(0, 4)))].reverse();
+  const el = $("ch-cal"); const W = Math.max(760, el.parentElement.clientWidth || 760);
+  const left = 58, cell = Math.max(10, Math.floor((W - left - 16) / 53)), gap = 30, top0 = 62;
+  const H = top0 + years.length * (7 * cell + gap) + 10; el.style.height = H + "px";
+  let visualMap;
+  const vm = { dimension: 1, orient: "horizontal", left: left, top: 4, textStyle: { color: tok("--fg-2"), fontSize: 11 } };
+  const cont = { type: "continuous", calculable: false, itemWidth: 12, itemHeight: Math.min(360, W - 200) };
+  const piece = { type: "piecewise", itemWidth: 16, itemHeight: 12, itemGap: 14, textGap: 5, itemSymbol: "roundRect" };
+  const dryCol = isDark() ? "rgba(255,255,255,.09)" : "rgba(0,0,0,.08)";
+  if (m.type === "heat") visualMap = { ...vm, ...cont, min: -20, max: 40, inRange: { color: HEAT.map(s => s[1]) }, text: ["40 °C", "−20 °C"], formatter: v => fmt(v, 0) };
+  else if (m.type === "rain") { const r = ramp("rain"); visualMap = { ...vm, ...piece, pieces: [{ lt: .1, label: "trocken", color: dryCol }, { gte: .1, lt: 1, label: "< 1", color: r[0] }, { gte: 1, lt: 5, label: "1–5", color: r[1] }, { gte: 5, lt: 10, label: "5–10", color: r[2] }, { gte: 10, lt: 20, label: "10–20", color: r[3] }, { gte: 20, lt: 40, label: "20–40", color: r[4] }, { gte: 40, label: "≥ 40 mm", color: r[6] }] }; }
+  else if (m.type === "wind") { const r = ramp("wind"); visualMap = { ...vm, ...piece, pieces: [{ lt: 20, label: "< 20", color: r[0] }, { gte: 20, lt: 40, label: "20–40", color: r[1] }, { gte: 40, lt: 50, label: "40–50", color: r[2] }, { gte: 50, lt: 62, label: "50–62", color: r[3] }, { gte: 62, lt: 75, label: "62–75", color: r[4] }, { gte: 75, label: "≥ 75 km/h", color: r[6] }] }; }
+  else { const r = ramp("sun"); visualMap = { ...vm, ...cont, min: 0, max: 1000, inRange: { color: r }, text: ["1.000 W/m²", "0"], formatter: v => fmtInt(v) }; }
+  const c = chart("ch-cal"); c.resize();
+  c.setOption(base({
+    tooltip: { trigger: "item", confine: true, backgroundColor: tok("--surface-2"), borderColor: tok("--line-2"), textStyle: { color: tok("--fg"), fontSize: 13 }, extraCssText: "border-radius:10px",
+      formatter: p => { const d = all[p.value[2]]; return `<b>${wday(d.d)}, ${fmtD(d.d)}</b>${d.partial ? " (heute)" : ""}<br>${m.label}: <b>${fmt(p.value[1], m.type === "sun" ? 0 : 1)}</b> ${m.u}` + (m.type === "heat" ? `<br><span style="color:${tok("--muted")}">${fmt(d.tn)} bis ${fmt(d.tx)} °C</span>` : ""); } },
+    visualMap,
+    calendar: years.map((y, i) => ({
+      top: top0 + i * (7 * cell + gap), left, right: 16, cellSize: [cell, cell], range: String(y), orient: "horizontal",
+      splitLine: { show: false }, itemStyle: { color: isDark() ? "rgba(255,255,255,.025)" : "rgba(0,0,0,.025)", borderColor: tok("--surface"), borderWidth: 2 },
+      yearLabel: { show: true, position: "left", margin: 34, color: tok("--fg"), fontFamily: "Barlow Condensed, sans-serif", fontSize: 18, fontWeight: 600 },
+      dayLabel: { firstDay: 1, nameMap: ["S", "M", "D", "M", "D", "F", "S"], color: tok("--muted"), fontSize: 9, margin: 6 },
+      monthLabel: { nameMap: MON3, color: tok("--muted"), fontSize: 11, margin: 6 }
+    })),
+    series: years.map((y, i) => ({ type: "heatmap", coordinateSystem: "calendar", calendarIndex: i, data: all.map((d, j) => [d, j]).filter(([d]) => d.d.startsWith(String(y)) && isNum(m.get(d))).map(([d, j]) => [d.d, Math.round(m.get(d) * 10) / 10, j]), itemStyle: { borderRadius: 2, borderColor: tok("--surface"), borderWidth: 1 } }))
+  }), true);
+}
+
+/* ---------------- Rendering: Regen ---------------- */
+function renderRain() {
+  const all = allDays(); if (!all.length) return;
+  const years = [...new Set(all.map(d => +d.d.slice(0, 4)))];
+  const series = [], totals = [];
+  for (const y of years) {
+    const ds = all.filter(d => d.d.startsWith(String(y)));
+    const data = new Array(MMDD.length).fill(null); let cum = 0;
+    for (const d of ds) { if (isNum(d.rd)) cum += d.rd; const i = doyIdx.get(d.d.slice(5)); if (i != null) data[i] = Math.round(cum * 10) / 10; }
+    const partialStart = ds.length && ds[0].d.slice(5) !== "01-01";
+    totals.push(`${y}: ${fmtInt(cum)} mm`);
+    series.push({ name: partialStart ? `${y} (ab ${fmtDs(ds[0].d)})` : String(y), type: "line", data, showSymbol: false, connectNulls: true, lineStyle: { width: y === years[years.length - 1] ? 3 : 1.8, color: yearColor(y) }, itemStyle: { color: yearColor(y) },
+      endLabel: { show: true, color: tok("--fg-2"), fontSize: 11, formatter: p => `${y}` } });
+  }
+  $("cv-raincum").textContent = totals.slice(-3).join(" · ");
+  chart("ch-raincum").setOption(base({
+    grid: { left: 48, right: 46, top: 34, bottom: 28 },
+    legend: { top: 0, left: 0, itemWidth: 14, itemHeight: 8, textStyle: { color: tok("--fg-2"), fontSize: 12 } },
+    tooltip: { ...base().tooltip, formatter: ps => { const md = MMDD[ps[0].dataIndex]; return `<b>bis ${md.slice(3)}.${md.slice(0, 2)}.</b><br>` + ps.filter(p => isNum(p.value)).map(p => `${dot(p.color)}${p.seriesName}: <b>${fmt(p.value)}</b> mm`).join("<br>"); } },
+    xAxis: ax({ type: "category", data: MMDD, boundaryGap: false, splitLine: { show: false }, axisLabel: { color: tok("--muted"), fontSize: 11, interval: i => MMDD[i].endsWith("-01"), formatter: v => MON3[+v.slice(0, 2) - 1] } }),
+    yAxis: ax({ type: "value", min: 0 }),
+    series
+  }), true);
+  const mons = monthAgg(all);
+  chart("ch-rainmon").setOption(base({
+    grid: { left: 40, right: 12, top: 34, bottom: 28 },
+    legend: { top: 0, left: 0, itemWidth: 14, itemHeight: 8, textStyle: { color: tok("--fg-2"), fontSize: 12 } },
+    tooltip: { ...base().tooltip, axisPointer: { type: "shadow", shadowStyle: { color: isDark() ? "rgba(255,255,255,.04)" : "rgba(0,0,0,.04)" } }, formatter: ps => `<b>${MONTHS[ps[0].dataIndex]}</b><br>` + ps.filter(p => isNum(p.value)).map(p => { const mo = mons.find(m => m.y === +p.seriesName && m.m === p.dataIndex + 1); return `${dot(p.color)}${p.seriesName}: <b>${fmt(p.value)}</b> mm${mo && !mo.complete ? ` <span style="color:${tok("--muted")}">(unvollständig)</span>` : ""}${mo ? ` · ${mo.rDays} Regentage` : ""}`; }).join("<br>") },
+    xAxis: ax({ type: "category", data: MON3, splitLine: { show: false } }),
+    yAxis: ax({ type: "value", min: 0 }),
+    series: years.map(y => ({ name: String(y), type: "bar", barGap: "12%", barMaxWidth: 14, itemStyle: { color: yearColor(y), borderRadius: [3, 3, 0, 0] }, data: MON3.map((_, i) => { const mo = mons.find(m => m.y === y && m.m === i + 1); return mo ? Math.round(mo.r * 10) / 10 : null; }) }))
+  }), true);
+}
+
+/* ---------------- Rendering: Kenntage ---------------- */
+function renderKenn() {
+  const all = allDays(); if (!all.length) return;
+  const years = [...new Set(all.map(d => +d.d.slice(0, 4)))].reverse();
+  const cols = [
+    { h: "Sommertage", s: "max ≥ 25 °C", f: d => d.tx >= 25, c: heat(26) },
+    { h: "Heiße Tage", s: "max ≥ 30 °C", f: d => d.tx >= 30, c: heat(31) },
+    { h: "Wüstentage", s: "max ≥ 35 °C", f: d => d.tx >= 35, c: heat(37) },
+    { h: "Tropennächte", s: "min ≥ 20 °C", f: d => d.tn >= 20, c: heat(34) },
+    { h: "Frosttage", s: "min < 0 °C", f: d => d.tn < 0, c: heat(-6) },
+    { h: "Eistage", s: "max < 0 °C", f: d => d.tx < 0, c: heat(-14) },
+    { h: "Regentage", s: "≥ 1 mm", f: d => d.rd >= 1, c: tok("--s1") },
+    { h: "Starkregen", s: "≥ 20 mm", f: d => d.rd >= 20, c: ramp("rain")[isDark() ? 1 : 5] },
+    { h: "Sturmtage", s: "Böe ≥ 75 km/h", f: d => d.wg >= 75, c: tok("--s7") }
+  ];
+  const rows = years.map(y => {
+    const ds = all.filter(d => d.d.startsWith(String(y)));
+    return { y, ds, n: ds.length, counts: cols.map(c => ds.filter(d => { try { return c.f(d); } catch { return false; } }).length),
+      tMean: mean(ds.map(d => d.t).filter(isNum)), tx: maxOf(ds.map(d => d.tx).filter(isNum)), tn: minOf(ds.map(d => d.tn).filter(isNum)), r: sum(ds.map(d => d.rd).filter(isNum)), full: ds.length >= 355 && ds[0].d.endsWith("-01-01") && ds[ds.length - 1].d.endsWith("-12-31") };
+  });
+  const maxes = cols.map((_, i) => Math.max(1, ...rows.map(r => r.counts[i])));
+  const rMax = Math.max(1, ...rows.map(r => r.r));
+  let h = `<thead><tr><th>Jahr<small>Messtage</small></th><th>Mittel<small>°C</small></th><th>Max<small>°C</small></th><th>Min<small>°C</small></th>${cols.map(c => `<th>${c.h}<small>${c.s}</small></th>`).join("")}<th>Niederschlag<small>Summe mm</small></th></tr></thead><tbody>`;
+  for (const r of rows) {
+    h += `<tr><td><b style="font-family:var(--font-display);font-size:1.1rem">${r.y}</b> <small>${r.n} Tage</small></td>
+      <td class="tint" style="--tc:${heat(r.tMean)}">${r.full ? fmt(r.tMean) : `<span title="unvollständiges Jahr">(${fmt(r.tMean)})</span>`}</td>
+      <td class="tint" style="--tc:${heat(r.tx)}">${fmt(r.tx)}</td><td class="tint" style="--tc:${heat(r.tn)}">${fmt(r.tn)}</td>
+      ${r.counts.map((n, i) => `<td><span class="cell"><b>${n}</b><span class="bar"><i style="width:${n / maxes[i] * 100}%;background:${cols[i].c}"></i></span></span></td>`).join("")}
+      <td><span class="cell"><b>${fmtInt(r.r)}</b><span class="bar"><i style="width:${r.r / rMax * 100}%;background:${tok("--s1")}"></i></span></span></td></tr>`;
+  }
+  $("tbl-kenn").innerHTML = h + "</tbody>";
+  const partial = rows.filter(r => !r.full).map(r => `${r.y} (${fmtD(r.ds[0].d)} – ${fmtD(r.ds[r.ds.length - 1].d)})`);
+  $("kenn-note").textContent = partial.length ? `Unvollständige Jahre: ${partial.join(", ")}. Jahresmittel in Klammern sind deshalb nicht vergleichbar.` : "";
+}
+
+/* ---------------- Rendering: Monatsrekorde ---------------- */
+function renderMonths() {
+  const all = allDays(); if (!all.length) return;
+  const mons = monthAgg(all);
+  const best = (list, get, dir) => { let b = null; for (const x of list) { const v = get(x); if (!isNum(v)) continue; if (!b || (dir === "max" ? v > b.v : v < b.v)) b = { v, x }; } return b; };
+  let h = `<thead><tr><th>Monat</th><th>Höchstwert<small>°C</small></th><th>Tiefstwert<small>°C</small></th><th>Wärmstes Mittel<small>°C, Monat</small></th><th>Kältestes Mittel<small>°C, Monat</small></th><th>Nassester Tag<small>mm</small></th><th>Nassester Monat<small>mm</small></th><th>Trockenster Monat<small>mm</small></th><th>Stärkste Böe<small>km/h</small></th></tr></thead><tbody>`;
+  for (let m = 1; m <= 12; m++) {
+    const ds = all.filter(d => +d.d.slice(5, 7) === m), ms = mons.filter(x => x.m === m && x.complete);
+    if (!ds.length) { h += `<tr><td>${MONTHS[m - 1]}</td>${"<td>–</td>".repeat(8)}</tr>`; continue; }
+    const tx = best(ds, d => d.tx, "max"), tn = best(ds, d => d.tn, "min"), rd = best(ds, d => d.rd, "max"), wg = best(ds, d => d.wg, "max");
+    const wm = best(ms, x => x.tMean, "max"), cm = best(ms, x => x.tMean, "min"), nm = best(ms, x => x.r, "max"), dm = best(ms, x => x.r, "min");
+    const dcell = (b, dec = 1) => b ? `<span class="cell"><b>${fmt(b.v, dec)}</b><small>${fmtDs(b.x.d)}${b.x.d.slice(0, 4)}</small></span>` : "–";
+    const mcell = b => b ? `<span class="cell"><b>${fmt(b.v)}</b><small>${b.x.y}</small></span>` : "–";
+    h += `<tr><td><b>${MONTHS[m - 1]}</b></td>
+      <td class="tint" style="--tc:${heat(tx && tx.v)}">${dcell(tx)}</td><td class="tint" style="--tc:${heat(tn && tn.v)}">${dcell(tn)}</td>
+      <td class="tint" style="--tc:${wm ? heat(wm.v) : "transparent"}">${mcell(wm)}</td><td class="tint" style="--tc:${cm ? heat(cm.v) : "transparent"}">${mcell(cm)}</td>
+      <td>${dcell(rd)}</td><td>${mcell(nm)}</td><td>${mcell(dm)}</td><td>${dcell(wg)}</td></tr>`;
+  }
+  $("tbl-mon").innerHTML = h + "</tbody>";
+  const years = [...new Set(all.map(d => +d.d.slice(0, 4)))];
+  chart("ch-tempmon").setOption(base({
+    grid: { left: 40, right: 40, top: 34, bottom: 28 },
+    legend: { top: 0, left: 0, itemWidth: 14, itemHeight: 8, textStyle: { color: tok("--fg-2"), fontSize: 12 } },
+    tooltip: { ...base().tooltip, formatter: ps => `<b>${MONTHS[ps[0].dataIndex]}</b><br>` + ps.filter(p => isNum(p.value)).map(p => { const mo = mons.find(m => m.y === +p.seriesName && m.m === p.dataIndex + 1); return `${dot(p.color)}${p.seriesName}: <b>${fmt(p.value)}</b> °C${mo && !mo.complete ? ` <span style="color:${tok("--muted")}">(unvollständig)</span>` : ""}`; }).join("<br>") },
+    xAxis: ax({ type: "category", data: MON3, boundaryGap: false, splitLine: { show: false } }),
+    yAxis: ax({ type: "value", scale: true, axisLabel: { color: tok("--muted"), fontSize: 11, formatter: v => fmtAx(v, "°") } }),
+    series: years.map(y => ({ name: String(y), type: "line", symbol: "circle", symbolSize: 7, lineStyle: { width: y === years[years.length - 1] ? 3 : 2, color: yearColor(y) }, itemStyle: { color: yearColor(y), borderColor: tok("--surface"), borderWidth: 2 },
+      data: MON3.map((_, i) => { const mo = mons.find(m => m.y === y && m.m === i + 1); return mo && isNum(mo.tMean) ? Math.round(mo.tMean * 10) / 10 : null; }) }))
+  }), true);
+}
+
+/* ---------------- Rendering: Wind ---------------- */
+function renderWind() {
+  const src = S.rose === "7d" ? S.h30 : allDays();
+  const bins = [[1, 5, "1–5"], [5, 10, "5–10"], [10, 20, "10–20"], [20, 30, "20–30"], [30, Infinity, "> 30"]];
+  const M = bins.map(() => new Array(16).fill(0)); let total = 0, calm = 0;
+  for (const p of src) {
+    if (!isNum(p.ws) || !isNum(p.wd)) continue; total++;
+    if (p.ws < 1) { calm++; continue; }
+    const s = Math.round(p.wd / 22.5) % 16, b = bins.findIndex(x => p.ws >= x[0] && p.ws < x[1]);
+    M[b][s]++;
+  }
+  const pct = v => total ? Math.round(v / total * 1000) / 10 : 0;
+  const sectorTot = DIRS.map((_, s) => sum(M.map(r => r[s])));
+  const main = sectorTot.indexOf(Math.max(...sectorTot));
+  $("rose-sub").textContent = total ? `Hauptwindrichtung ${DIRS[main]} (${fmt(pct(sectorTot[main]))} %), Windstille unter 1 km/h: ${fmt(pct(calm))} %. Basis: ${fmtInt(total)} ${S.rose === "7d" ? "Halbstundenwerte der letzten 7 Tage" : "Tagesmittel seit Messbeginn"}.` : "Keine Winddaten.";
+  const outer = Math.max(5, Math.ceil(Math.max(...sectorTot.map(pct)) / 5) * 5);
+  const r = ramp("wind");
+  const colors = isDark() ? [r[2], r[3], r[4], r[5], r[6]] : [r[1], r[2], r[3], r[4], r[6]];
+  chart("ch-rose").setOption(base({
+    tooltip: { trigger: "item", confine: true, backgroundColor: tok("--surface-2"), borderColor: tok("--line-2"), textStyle: { color: tok("--fg"), fontSize: 13 }, extraCssText: "border-radius:10px", formatter: p => `<b>aus ${DIRS[p.dataIndex]}</b><br>${dot(p.color)}${p.seriesName} km/h: <b>${fmt(p.value)}</b> %<br><span style="color:${tok("--muted")}">Sektor gesamt ${fmt(pct(sectorTot[p.dataIndex]))} %</span>` },
+    legend: { bottom: 0, itemWidth: 14, itemHeight: 8, textStyle: { color: tok("--fg-2"), fontSize: 12 }, formatter: n => n + " km/h" },
+    polar: { radius: ["6%", "74%"], center: ["50%", "48%"] },
+    angleAxis: { type: "category", data: DIRS, startAngle: 90 + 11.25, boundaryGap: true, axisLine: { lineStyle: { color: tok("--line-2") } }, axisTick: { show: false }, axisLabel: { color: tok("--fg-2"), fontSize: 11, interval: 0 }, splitLine: { show: true, lineStyle: { color: tok("--line") } } },
+    radiusAxis: { max: outer, interval: outer / 5, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: tok("--muted"), fontSize: 10, formatter: v => v === outer ? fmtAx(v, " %") : "" }, splitLine: { lineStyle: { color: tok("--line") } } },
+    series: bins.map((b, i) => ({ type: "bar", coordinateSystem: "polar", stack: "w", name: b[2], data: M[i].map(pct), itemStyle: { color: colors[i], borderColor: tok("--surface"), borderWidth: 1 }, emphasis: { focus: "series" } }))
+  }), true);
+  // Böen pro Monat
+  const all = allDays(), mons = monthAgg(all);
+  const cats = mons.map(m => `${MON3[m.m - 1]} ${String(m.y).slice(2)}`);
+  chart("ch-gustmon").setOption(base({
+    grid: { left: 40, right: 64, top: 16, bottom: 30 },
+    tooltip: { ...base().tooltip, axisPointer: { type: "shadow", shadowStyle: { color: isDark() ? "rgba(255,255,255,.04)" : "rgba(0,0,0,.04)" } }, formatter: ps => { const m = mons[ps[0].dataIndex]; return `<b>${MONTHS[m.m - 1]} ${m.y}</b><br>${dot(ps[0].color)}stärkste Böe: <b>${fmt(m.wgMax)}</b> km/h<br><span style="color:${tok("--muted")}">Bft ${beaufort(m.wgMax || 0)[0]} · ${beaufort(m.wgMax || 0)[1]}</span>`; } },
+    xAxis: ax({ type: "category", data: cats, splitLine: { show: false }, axisLabel: { color: tok("--muted"), fontSize: 10, interval: i => mons[i].m === 1 || i === 0, formatter: (v, i) => mons[i] ? (mons[i].m === 1 || i === 0 ? `${MON3[mons[i].m - 1]} ${mons[i].y}` : "") : v } }),
+    yAxis: ax({ type: "value", min: 0 }),
+    visualMap: { show: false, type: "piecewise", pieces: [{ lt: 50, color: colors[1] }, { gte: 50, lt: 75, color: colors[3] }, { gte: 75, color: tok("--s5") }] },
+    series: [{ type: "bar", name: "Böe", data: mons.map(m => isNum(m.wgMax) ? m.wgMax : null), barMaxWidth: 14, itemStyle: { borderRadius: [3, 3, 0, 0] },
+      markLine: { silent: true, symbol: "none", lineStyle: { color: tok("--muted"), type: "solid", width: 1 }, label: { color: tok("--muted"), fontSize: 10, formatter: "Sturm\nBft 9", position: "end" }, data: [{ yAxis: 75 }] } }]
+  }), true);
+}
+
+/* ---------------- Rendering: An diesem Tag ---------------- */
+function renderOTD() {
+  const all = allDays(); if (!all.length) return;
+  const today = all[all.length - 1].d, md = today.slice(5);
+  $("otd-title").textContent = `An diesem Tag: ${+md.slice(3)}. ${MONTHS[+md.slice(0, 2) - 1]}`;
+  const ds = all.filter(d => d.d.slice(5) === md).reverse();
+  const lo = Math.min(...ds.map(d => d.tn).filter(isNum), 0) - 2, hi = Math.max(...ds.map(d => d.tx).filter(isNum), 10) + 2;
+  const txBest = Math.max(...ds.map(d => d.tx).filter(isNum)), tnBest = Math.min(...ds.map(d => d.tn).filter(isNum));
+  $("otd").innerHTML = ds.map(d => {
+    const a = (d.tn - lo) / (hi - lo) * 100, b = (d.tx - lo) / (hi - lo) * 100;
+    return `<article class="card" style="background:radial-gradient(120% 100% at 0 0, color-mix(in srgb, ${heat(d.t)} 22%, transparent), transparent 60%), var(--surface)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="yr">${d.d.slice(0, 4)}</span><span class="muted" style="font-size:.84rem">${d.partial ? "heute, bisher" : wday(d.d)}</span></div>
+      <div class="tbar" style="background:var(--surface-2);position:relative"><i style="position:absolute;top:0;bottom:0;left:${a}%;width:${Math.max(2, b - a)}%;border-radius:999px;background:linear-gradient(90deg, ${heat(d.tn)}, ${heat(d.tx)})"></i></div>
+      <div class="grid2">
+        <div class="kv"><span class="lbl">Max</span><b class="num">${fmt(d.tx)} °C</b>${d.tx === txBest && ds.length > 1 ? '<span class="chip" style="--c:' + heat(d.tx) + '">wärmster</span>' : ""}</div>
+        <div class="kv"><span class="lbl">Min</span><b class="num">${fmt(d.tn)} °C</b>${d.tn === tnBest && ds.length > 1 ? '<span class="chip" style="--c:' + heat(d.tn) + '">kältester</span>' : ""}</div>
+        <div class="kv"><span class="lbl">Regen</span><b class="num">${fmt(d.rd)} mm</b></div>
+        <div class="kv"><span class="lbl">Böe</span><b class="num">${fmt(d.wg)} km/h</b></div>
+      </div></article>`;
+  }).join("") || `<p class="muted">Für diesen Kalendertag gibt es noch keine Daten.</p>`;
+}
+
+/* ---------------- Footer ---------------- */
+function renderFooter() {
+  const days = allDays();
+  const parts2 = [
+    `Datenquelle: Ecowitt-Cloud (api.ecowitt.net) · ${fmtInt(days.length)} Messtage${days.length ? ` vom ${fmtD(days[0].d)} bis heute` : ""}.`,
+    S.mode === "static" ? `Die Daten werden etwa alle 15 Minuten automatisch von der Station abgeholt. Stand: ${S.rtAt ? new Date(S.rtAt).toLocaleString("de-DE", { dateStyle: "long", timeStyle: "short", timeZone: TZ() }) + " Uhr" : "–"}.` : S.mode === "snap" ? `Stand der Daten: ${S.rtAt ? new Date(S.rtAt).toLocaleString("de-DE", { dateStyle: "long", timeStyle: "short", timeZone: TZ() }) + " Uhr" : "–"}.` : `Live-Werte werden jede Minute aktualisiert, Detailverläufe alle 5 Minuten. Der Verlauf wird im Browser zwischengespeichert, damit das Programm schnell startet.`,
+    S.mode === "static" ? `Die Seite lädt neue Daten alle 5 Minuten von selbst nach.` : S.mode === "snap" ? `Diese Ansicht wird nicht automatisch aktualisiert.` : `Zuletzt geladen: ${S.rtAt ? new Date(S.rtAt).toLocaleString("de-DE", { timeZone: TZ() }) : "–"}.`
+  ];
+  const gap = []; const ks = [...S.daily.keys()].sort();
+  for (let i = 1; i < ks.length; i++) { const g = diffDays(ks[i - 1], ks[i]); if (g > 1) gap.push(`${fmtD(addDays(ks[i - 1], 1))} – ${fmtD(addDays(ks[i], -1))}`); }
+  if (gap.length) parts2.push(`Datenlücken (Station offline): ${gap.join(", ")}.`);
+  $("foot").innerHTML = parts2.map(p => `<p>${esc(p)}</p>`).join("");
+}
+
+/* ---------------- Gesamt-Render ---------------- */
+function renderAll() {
+  const fns = [renderNow, renderCompare, renderHistory, renderRecords, renderYear, renderCalendar, renderRain, renderKenn, renderMonths, renderWind, renderOTD, renderFooter];
+  for (const f of fns) { try { f(); } catch (e) { console.error(f.name, e); } }
+  tickStatus();
+}
+
+/* ---------------- Laden ---------------- */
+async function refreshAll(full) {
+  if (S.loading) return; S.loading = true;
+  $("btn-refresh").classList.add("spin");
+  try {
+    setStatus("load", "Verbinde …");
+    if (!S.info || full) await loadInfo();
+    setStatus("load", "Live-Werte …"); await loadRealtime();
+    renderNow(); renderCompare();
+    await loadDaily(t => setStatus("load", t + " …"));
+    setStatus("load", "Detailverläufe …"); await loadIntraday();
+    S.mode = "live"; S.lastError = null; saveCache(); banner(null);
+  } catch (e) {
+    console.error(e); S.lastError = e.message;
+    banner(`<b>Daten konnten nicht geladen werden.</b> ${esc(e.message)}${S.daily.size ? " Angezeigt wird der zuletzt gespeicherte Stand." : ""}`);
+    setStatus("error", "Fehler beim Laden");
+    S.loading = false; $("btn-refresh").classList.remove("spin"); renderAll(); return;
+  }
+  S.loading = false; $("btn-refresh").classList.remove("spin");
+  renderAll();
+}
+async function tickRealtime() {
+  if (S.loading || S.mode !== "live") return;
+  try { await loadRealtime(); S.lastError = null; banner(null); renderNow(); renderCompare(); tickStatus(); saveCache(); } catch (e) { console.warn(e); S.lastError = e.message; tickStatus(); }
+}
+async function tickIntraday() {
+  if (S.loading || S.mode !== "live") return;
+  try {
+    const today = localDate(Date.now());
+    const lastDaily = [...S.daily.keys()].sort().pop();
+    if (lastDaily && lastDaily < addDays(today, -1)) await loadDaily();
+    await loadIntraday("5"); if (!S._t30 || Date.now() - S._t30 > 30 * 60e3) { await loadIntraday("30"); S._t30 = Date.now(); }
+    saveCache(); renderAll();
+  } catch (e) { console.warn(e); }
+}
+
+/* ---------------- UI ---------------- */
+function bindSeg(id, fn) {
+  $(id).addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (!b) return; for (const x of $(id).querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b)); fn(b.dataset.v); });
+}
+function openSettings() {
+  const k = keys() || {}; $("f-app").value = k.applicationKey || ""; $("f-api").value = k.apiKey || ""; $("f-mac").value = k.mac || "";
+  $("modal").hidden = false; $("f-app").focus();
+}
+function initUI() {
+  bindSeg("seg-range", v => { S.range = v; renderHistory(); });
+  bindSeg("seg-rec", v => { S.recScope = v; renderRecords(); });
+  bindSeg("seg-year", v => { S.year = +v; renderYear(); });
+  bindSeg("seg-cal", v => { S.cal = v; renderCalendar(); });
+  bindSeg("seg-rose", v => { S.rose = v; renderWind(); });
+  $("chk-outlier").addEventListener("change", e => { S.outliers = e.target.checked; renderAll(); });
+  $("btn-refresh").addEventListener("click", () => CONFIG.dataUrl ? loadStatic(true) : refreshAll(true));
+  $("btn-settings").addEventListener("click", openSettings);
+  $("btn-cancel").addEventListener("click", () => { $("modal").hidden = true; });
+  $("modal").addEventListener("click", e => { if (e.target === $("modal")) $("modal").hidden = true; });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") $("modal").hidden = true; });
+  $("btn-save").addEventListener("click", () => {
+    const k = { applicationKey: $("f-app").value.trim(), apiKey: $("f-api").value.trim(), mac: $("f-mac").value.trim().toUpperCase() };
+    store.set("ws-keys", k); $("modal").hidden = true; S.daily.clear(); S.info = null; S.h5 = []; S.h30 = [];
+    const c = store.get(cacheKey()); if (c) applyCache(c);
+    refreshAll(true);
+  });
+  $("btn-clear").addEventListener("click", () => { store.del(cacheKey()); S.daily.clear(); S.h5 = []; S.h30 = []; $("modal").hidden = true; refreshAll(true); });
+  if (CONFIG.hideControls) { $("btn-settings").hidden = true; $("btn-refresh").hidden = true; }
+  if (CONFIG.dataUrl) $("btn-settings").hidden = true;
+  let rT; const rerender = () => { clearTimeout(rT); rT = setTimeout(renderAll, 60); };
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerender);
+  new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+  let lastW = innerWidth; addEventListener("resize", () => { if (Math.abs(innerWidth - lastW) > 40) { lastW = innerWidth; clearTimeout(rT); rT = setTimeout(renderCalendar, 150); } });
+  setInterval(tickStatus, 5000);
+}
+
+/** Statischer Modus: Daten kommen als data.json neben der Seite (z. B. GitHub Pages). */
+async function loadStatic(manual) {
+  if (S.loading) return; S.loading = true; $("btn-refresh").classList.add("spin");
+  if (!S.daily.size) setStatus("load", "Lade Daten …");
+  try {
+    const r = await fetch(CONFIG.dataUrl + (CONFIG.dataUrl.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error(`Die Datendatei antwortet mit HTTP ${r.status}.`);
+    const c = await r.json();
+    if (!applyCache(c)) throw new Error("Die Datendatei hat ein unbekanntes Format.");
+    S.lastError = null; banner(null);
+  } catch (e) {
+    console.error(e); S.lastError = e.message;
+    banner(`<b>Neue Daten konnten nicht geladen werden.</b> ${esc(e.message)}${S.daily.size ? " Angezeigt wird der letzte Stand." : ""}`);
+  }
+  S.loading = false; $("btn-refresh").classList.remove("spin");
+  renderAll();
+}
+
+async function boot() {
+  initUI();
+  if (CONFIG.dataUrl) {
+    S.mode = "static";
+    await loadStatic();
+    setInterval(() => { if (!document.hidden) loadStatic(); }, 5 * 60e3);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && S.savedAt && Date.now() - S.savedAt > 10 * 60e3) loadStatic(); });
+    return;
+  }
+  if (!window.echarts) banner("Die Diagramm-Bibliothek konnte nicht geladen werden (cdn.jsdelivr.net). Live-Werte funktionieren trotzdem.", "info");
+  const cached = keys() ? store.get(cacheKey()) : null;
+  const usable = c => c && c.v === 1 && c.daily && c.daily.length;
+  if (usable(cached)) applyCache(cached);
+  else if (usable(SNAPSHOT)) applyCache(SNAPSHOT);
+  if (!keys()) {
+    S.mode = "snap";
+    if (!S.daily.size) { banner("Noch keine Schlüssel hinterlegt. Öffne die Einstellungen (Zahnrad oben rechts) und trage Application Key, API Key und MAC-Adresse ein.", "info"); setStatus("error", "Nicht verbunden"); }
+    renderAll(); return;
+  }
+  if (S.daily.size) renderAll();
+  await refreshAll(!S.info);
+  setInterval(tickRealtime, 60e3);
+  setInterval(tickIntraday, 5 * 60e3);
+}
+boot();
+</script>

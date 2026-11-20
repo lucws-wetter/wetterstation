@@ -1,0 +1,9 @@
+# Private Dateien mit deinen API-Schlüsseln: niemals hochladen
+config.local.json
+wetterstation.html
+# Erzeugte Dateien
+site/
+dist/
+vorschau/
+__pycache__/
+*.pyc

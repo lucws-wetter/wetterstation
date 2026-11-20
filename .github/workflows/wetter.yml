@@ -1,0 +1,54 @@
+name: Wetterdaten aktualisieren
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # etwa alle 15 Minuten (GitHub startet manchmal etwas später)
+  workflow_dispatch:          # von Hand starten: Actions -> Wetterdaten aktualisieren -> Run workflow
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # Tageswerte (data/daily.json) zurückschreiben
+  pages: write
+  id-token: write
+
+concurrency:
+  group: wetter
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Daten von Ecowitt holen
+        env:
+          ECOWITT_APPLICATION_KEY: ${{ secrets.ECOWITT_APPLICATION_KEY }}
+          ECOWITT_API_KEY: ${{ secrets.ECOWITT_API_KEY }}
+          ECOWITT_MAC: ${{ secrets.ECOWITT_MAC }}
+        run: python3 scripts/fetch_data.py
+
+      - name: Seite bauen
+        run: python3 build.py site
+
+      - name: Neue Tageswerte speichern
+        run: |
+          if ! git diff --quiet -- data/; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/
+            git commit -m "Tageswerte aktualisiert"
+            git push || echo "Push übersprungen (Repository hat sich inzwischen geändert)"
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
