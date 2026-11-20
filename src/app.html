@@ -336,6 +336,8 @@ table.mm button.mrow:hover { color: var(--accent); }
 .rd-anch { position: relative; height: 16px; font-size: .72rem; color: var(--muted); }
 .rd-anch span { position: absolute; top: 2px; white-space: nowrap; }
 .leaflet-container { font-family: var(--font-body); background: var(--surface-2); }
+.basemap-light { filter: grayscale(1) contrast(.92) brightness(1.04); }
+.basemap-dark { filter: invert(1) grayscale(1) brightness(.78) contrast(1.12); }
 .radar-map.leaflet-container .leaflet-bar a, .radar-map.leaflet-container .leaflet-bar a:hover { background: var(--surface); color: var(--fg); border-bottom-color: var(--line); }
 .radar-map.leaflet-container .leaflet-bar { border: 1px solid var(--line-2); box-shadow: var(--shadow); }
 .radar-map.leaflet-container .leaflet-control-attribution { background: color-mix(in srgb, var(--surface) 82%, transparent); color: var(--muted); font-size: 10px; }
@@ -2069,11 +2071,10 @@ async function radarInit() {
 }
 function radarBasemap() {
   const dark = isDark(); if (R.dark === dark && R.base) return; R.dark = dark;
-  if (R.base) R.map.removeLayer(R.base); if (R.labels) R.map.removeLayer(R.labels);
-  const style = dark ? "dark" : "light";
-  const attr = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>';
-  R.base = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}_nolabels/{z}/{x}/{y}{r}.png`, { subdomains: "abcd", maxZoom: 19, attribution: attr }).addTo(R.map);
-  R.labels = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}_only_labels/{z}/{x}/{y}{r}.png`, { subdomains: "abcd", maxZoom: 19, pane: "labels" }).addTo(R.map);
+  if (R.base) R.map.removeLayer(R.base);
+  // OpenStreetMap ohne API-Schlüssel; per CSS-Filter dezent grau (hell) bzw. dunkelgrau (dunkel) eingefärbt
+  R.base = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, className: dark ? "basemap basemap-dark" : "basemap basemap-light",
+    attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende' }).addTo(R.map);
 }
 async function radarMode(mode, refresh) {
   const m = RADAR_MODES[mode] || RADAR_MODES.live;
@@ -2094,7 +2095,7 @@ async function radarMode(mode, refresh) {
   const sl = $("rd-slider"); sl.max = Math.max(0, frames.length - 1);
   radarLegend(legend, info);
   $("rd-sub").textContent = m.desc;
-  $("rd-note").innerHTML = `Radar: ${esc(info.attribution || "")}${info.licence ? ` (${esc(info.licence)})` : ""}, bereitgestellt über <a href="https://meteocore.com/" target="_blank" rel="noopener">meteoCORE</a>. Hintergrundkarte: © OpenStreetMap-Mitwirkende, © CARTO. Mausrad-Zoom nach einem Klick in die Karte.`;
+  $("rd-note").innerHTML = `Radar: ${esc(info.attribution || "")}${info.licence ? ` (${esc(info.licence)})` : ""}, bereitgestellt über <a href="https://meteocore.com/" target="_blank" rel="noopener">meteoCORE</a>. Hintergrundkarte: © OpenStreetMap-Mitwirkende. Mausrad-Zoom nach einem Klick in die Karte.`;
   radarShow(keepLatest || R.idx >= frames.length ? R.lastObs : R.idx);
 }
 function radarLayer(f) {
