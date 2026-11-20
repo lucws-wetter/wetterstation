@@ -320,6 +320,27 @@ table.mm button.mrow:hover { color: var(--accent); }
   .mp { flex: none; }
 }
 
+/* ---------- Radar ---------- */
+.radar-card { overflow: hidden; padding: 0; }
+.radar-map { height: min(64vh, 580px); min-height: 360px; background: var(--surface-2); }
+.radar-bar { display: flex; align-items: center; gap: 10px 12px; padding: 10px 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.radar-bar input[type="range"] { flex: 1 1 200px; min-width: 0; accent-color: var(--accent); }
+.rd-time { font-family: var(--font-display); font-weight: 600; font-size: 1.2rem; min-width: 6.5ch; }
+.radar-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 0 14px 12px; font-size: .8rem; color: var(--fg-2); }
+.radar-legend:empty { display: none; }
+.radar-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.radar-legend i { width: 18px; height: 10px; border-radius: 3px; }
+.rd-strip { flex: 1 1 260px; max-width: 520px; min-width: 0; }
+.rd-seg { display: flex; height: 10px; border-radius: 999px; overflow: hidden; }
+.rd-seg i { flex: 1; width: auto; height: 100%; border-radius: 0; }
+.rd-anch { position: relative; height: 16px; font-size: .72rem; color: var(--muted); }
+.rd-anch span { position: absolute; top: 2px; white-space: nowrap; }
+.leaflet-container { font-family: var(--font-body); background: var(--surface-2); }
+.radar-map.leaflet-container .leaflet-bar a, .radar-map.leaflet-container .leaflet-bar a:hover { background: var(--surface); color: var(--fg); border-bottom-color: var(--line); }
+.radar-map.leaflet-container .leaflet-bar { border: 1px solid var(--line-2); box-shadow: var(--shadow); }
+.radar-map.leaflet-container .leaflet-control-attribution { background: color-mix(in srgb, var(--surface) 82%, transparent); color: var(--muted); font-size: 10px; }
+.radar-map.leaflet-container .leaflet-control-attribution a { color: var(--accent); }
+
 /* ---------- Footer & Dialog ---------- */
 footer { margin-top: 48px; border-top: 1px solid var(--line); padding-block: 22px 40px; color: var(--muted); font-size: .85rem; }
 footer p { margin: 4px 0; max-width: 100ch; }
@@ -351,7 +372,7 @@ footer p { margin: 4px 0; max-width: 100ch; }
       </div>
     </div>
     <nav class="secnav" aria-label="Abschnitte">
-      <a href="#jetzt">Jetzt</a><a href="#vorhersage" id="nav-fc" hidden>Vorhersage</a><a href="#verlauf">Verlauf</a><a href="#rekorde">Rekorde</a><a href="#jahresgang">Jahresgang</a><a href="#kalender">Kalender</a><a href="#regen">Regen</a><a href="#kenntage">Kenntage</a><a href="#monate">Monatsrekorde</a><a href="#wind">Wind</a><a href="#diesertag">An diesem Tag</a>
+      <a href="#jetzt">Jetzt</a><a href="#radar" id="nav-rd" hidden>Radar</a><a href="#vorhersage" id="nav-fc" hidden>Vorhersage</a><a href="#verlauf">Verlauf</a><a href="#rekorde">Rekorde</a><a href="#jahresgang">Jahresgang</a><a href="#kalender">Kalender</a><a href="#regen">Regen</a><a href="#kenntage">Kenntage</a><a href="#monate">Monatsrekorde</a><a href="#wind">Wind</a><a href="#diesertag">An diesem Tag</a>
     </nav>
   </div>
 </div>
@@ -448,6 +469,26 @@ footer p { margin: 4px 0; max-width: 100ch; }
     <div class="rec-group-title"><h3>Heute im Vergleich</h3><span class="ln"></span><span class="muted" id="cmp-n" style="font-size:.84rem"></span></div>
     <div class="compare" id="compare"></div>
     <div class="extra" id="extra"></div>
+  </section>
+
+  <!-- ================= RADAR ================= -->
+  <section id="radar" class="sec" hidden>
+    <div class="sec-head">
+      <div><h2>Radar</h2><p id="rd-sub">Niederschlagsradar, frei zoombar.</p></div>
+      <div class="seg" id="seg-rd" role="group" aria-label="Radarprodukt"></div>
+    </div>
+    <figure class="card radar-card" style="margin:0">
+      <div class="radar-map" id="radar-map" role="region" aria-label="Radarkarte"></div>
+      <div class="radar-bar">
+        <button class="icon-btn" id="rd-play" aria-label="Abspielen"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg></button>
+        <input type="range" id="rd-slider" min="0" max="0" value="0" aria-label="Zeitpunkt">
+        <span class="rd-time num" id="rd-time">–</span>
+        <span class="chip" id="rd-kind" style="--c:var(--good)">Messung</span>
+        <button class="icon-btn" id="rd-center" title="Karte auf die Station zentrieren" aria-label="Karte auf die Station zentrieren"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+      </div>
+      <div class="radar-legend" id="rd-legend"></div>
+    </figure>
+    <p class="note" id="rd-note"></p>
   </section>
 
   <!-- ================= VORHERSAGE ================= -->
@@ -1975,6 +2016,157 @@ function renderFcNote(f, sel, m) {
   $("fc-note").innerHTML = src.join(" ") + (attr.size ? ` <details style="margin-top:6px"><summary style="cursor:pointer;color:var(--accent)">Alle Datenquellen (${attr.size})</summary><ul style="margin:6px 0 0;padding-left:18px">${[...attr].map(a => `<li>${esc(a)}</li>`).join("")}</ul></details>` : "");
 }
 
+/* ---------------- Radar (meteoCORE über Proxy) ---------------- */
+const RADAR_MODES = {
+  live: { label: "Radar 250 m", src: "mc-dwd-250-max", palette: "dbz_dwd", nowcast: false, maxNative: 11, desc: "Niederschlagsradar des DWD als hochauflösendes meteoCORE-Komposit (250 m), alle 5 Minuten neu. Play zeigt die letzte Stunde." },
+  nowcast: { label: "Mit Vorhersage", src: "dwd-wn", palette: "dbz_dwd", nowcast: true, maxNative: 10, desc: "DWD-Radar mit Kurzfristvorhersage: die letzte Stunde und die nächsten 2 Stunden in 5-Minuten-Schritten." },
+  europe: { label: "Europa", src: "opera", palette: "dbz_dwd", nowcast: false, maxNative: 9, desc: "Europaweites Radarkomposit der Wetterdienste (EUMETNET OPERA)." },
+  hail: { label: "Hagel", src: "mc-dwd-hail", palette: null, nowcast: false, maxNative: 11, desc: "Hagelschätzung aus dem 3D-Radar (meteoCORE). Grün ist Regen ohne Hagel, ab Blau die geschätzte Größe der Hagelkörner." }
+};
+const LEAFLET_JS = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js";
+const LEAFLET_CSS = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
+const R = { inited: false, map: null, mode: "live", frames: [], idx: 0, layers: new Map(), playing: false, timer: null, base: null, labels: null, dark: null, info: null, palette: null };
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (R._loading) return R._loading;
+  R._loading = new Promise((res, rej) => {
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = LEAFLET_CSS; document.head.appendChild(l);
+    const s = document.createElement("script"); s.src = LEAFLET_JS; s.onload = res; s.onerror = () => rej(new Error("Kartenbibliothek nicht ladbar")); document.head.appendChild(s);
+  });
+  return R._loading;
+}
+const rpx = path => CONFIG.radarProxy.replace(/\/$/, "") + path;
+async function rjson(path) { const r = await fetch(rpx(path)); if (!r.ok) throw new Error(`Radar-Proxy antwortet mit HTTP ${r.status}`); return r.json(); }
+const tsMs = ts => Date.UTC(+ts.slice(0, 4), +ts.slice(4, 6) - 1, +ts.slice(6, 8), +ts.slice(8, 10), +ts.slice(10, 12));
+
+function renderRadar() {
+  const sec = $("radar"), on = !!CONFIG.radarProxy;
+  sec.hidden = !on; $("nav-rd").hidden = !on;
+  if (!on) return;
+  $("seg-rd").innerHTML = Object.entries(RADAR_MODES).map(([k, v]) => `<button data-v="${k}" aria-pressed="${R.mode === k}">${v.label}</button>`).join("");
+  if (R.map) { radarBasemap(); return; }
+  if (R.inited) return;
+  R.inited = true;
+  const start = () => radarInit().catch(e => { console.error(e); $("rd-note").textContent = "Die Radarkarte konnte nicht geladen werden: " + e.message; });
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); start(); } }, { rootMargin: "600px" });
+    io.observe(sec);
+  } else start();
+}
+async function radarInit() {
+  await loadLeaflet();
+  const i = S.info || {};
+  R.center = [isNum(i.lat) ? i.lat : 50.2, isNum(i.lon) ? i.lon : 8.7];
+  R.map = L.map("radar-map", { minZoom: 4, maxZoom: 12, zoomSnap: 0.5, scrollWheelZoom: false }).setView(R.center, 8);
+  R.map.attributionControl.setPrefix(false);
+  R.map.createPane("radar").style.zIndex = 350;
+  const lp = R.map.createPane("labels"); lp.style.zIndex = 450; lp.style.pointerEvents = "none";
+  R.map.on("focus click", () => R.map.scrollWheelZoom.enable());
+  R.map.on("mouseout", () => R.map.scrollWheelZoom.disable());
+  radarBasemap();
+  await radarMode(R.mode);
+  setInterval(() => { if (!R.playing && !document.hidden) radarMode(R.mode, true).catch(() => {}); }, 5 * 60e3);
+}
+function radarBasemap() {
+  const dark = isDark(); if (R.dark === dark && R.base) return; R.dark = dark;
+  if (R.base) R.map.removeLayer(R.base); if (R.labels) R.map.removeLayer(R.labels);
+  const style = dark ? "dark" : "light";
+  const attr = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>';
+  R.base = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}_nolabels/{z}/{x}/{y}{r}.png`, { subdomains: "abcd", maxZoom: 19, attribution: attr }).addTo(R.map);
+  R.labels = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}_only_labels/{z}/{x}/{y}{r}.png`, { subdomains: "abcd", maxZoom: 19, pane: "labels" }).addTo(R.map);
+}
+async function radarMode(mode, refresh) {
+  const m = RADAR_MODES[mode] || RADAR_MODES.live;
+  const keepLatest = !refresh || R.idx === R.lastObs;
+  radarStop(); R.mode = mode;
+  for (const b of $("seg-rd").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === mode));
+  const [ts, info, pals] = await Promise.all([rjson(`/api/v1/radar/${m.src}/timestamps`), rjson(`/api/v1/radar/${m.src}/info`), rjson(`/api/v1/radar/${m.src}/palettes`).catch(() => ({ palettes: [] }))]);
+  R.info = info;
+  R.palette = m.palette && (pals.palettes || []).some(p => p.key === m.palette) ? m.palette : null;
+  const legend = await rjson(`/api/v1/radar/${m.src}/legend${R.palette ? "?palette=" + R.palette : ""}`).catch(() => null);
+  const past = (ts.timestamps || []).slice().sort();
+  const frames = past.map(t => ({ ts: t, lead: 0 }));
+  if (m.nowcast && past.length) for (const lead of info.lead_minutes || []) if (lead > 0) frames.push({ ts: past[past.length - 1], lead });
+  for (const [, layer] of R.layers) R.map.removeLayer(layer);
+  R.layers.clear();
+  R.frames = frames; R.lastObs = past.length - 1;
+  const b = info.bbox; R.bounds = b ? L.latLngBounds([[b[1], b[0]], [b[3], b[2]]]) : null;
+  const sl = $("rd-slider"); sl.max = Math.max(0, frames.length - 1);
+  radarLegend(legend, info);
+  $("rd-sub").textContent = m.desc;
+  $("rd-note").innerHTML = `Radar: ${esc(info.attribution || "")}${info.licence ? ` (${esc(info.licence)})` : ""}, bereitgestellt über <a href="https://meteocore.com/" target="_blank" rel="noopener">meteoCORE</a>. Hintergrundkarte: © OpenStreetMap-Mitwirkende, © CARTO. Mausrad-Zoom nach einem Klick in die Karte.`;
+  radarShow(keepLatest || R.idx >= frames.length ? R.lastObs : R.idx);
+}
+function radarLayer(f) {
+  const key = f.ts + "/" + f.lead;
+  let layer = R.layers.get(key);
+  if (layer) return layer;
+  const m = RADAR_MODES[R.mode];
+  const url = rpx(`/api/v1/radar/${m.src}/tiles/${f.ts}/${String(f.lead).padStart(3, "0")}/{z}/{x}/{y}.png${R.palette ? "?palette=" + R.palette : ""}`);
+  layer = L.tileLayer(url, { pane: "radar", opacity: 0, maxNativeZoom: m.maxNative, maxZoom: 12, bounds: R.bounds || undefined, keepBuffer: 1, updateWhenZooming: false });
+  layer.addTo(R.map); R.layers.set(key, layer);
+  return layer;
+}
+function radarShow(i) {
+  if (!R.frames.length) return;
+  R.idx = clamp(i, 0, R.frames.length - 1);
+  const f = R.frames[R.idx], cur = radarLayer(f);
+  for (const [, l] of R.layers) l.setOpacity(l === cur ? .82 : 0);
+  for (const k of [1, 2]) { const n = R.frames[(R.idx + k) % R.frames.length]; if (n) radarLayer(n); }
+  const keep = new Set(); for (let k = -2; k <= 3; k++) { const n = R.frames[(R.idx + k + R.frames.length) % R.frames.length]; if (n) keep.add(n.ts + "/" + n.lead); }
+  for (const [key, l] of R.layers) if (!keep.has(key)) { R.map.removeLayer(l); R.layers.delete(key); }
+  $("rd-slider").value = R.idx;
+  const ms = tsMs(f.ts) + f.lead * 60e3;
+  $("rd-time").textContent = hhmm(ms) + " Uhr";
+  const k = $("rd-kind");
+  if (f.lead > 0) { k.textContent = `Vorhersage +${f.lead} min`; k.style.setProperty("--c", "var(--warn)"); }
+  else { k.textContent = R.idx === R.lastObs ? `Messung · ${ago(ms)}` : "Messung"; k.style.setProperty("--c", "var(--good)"); }
+}
+function radarPlay() {
+  if (R.playing) { radarStop(); return; }
+  R.playing = true; $("rd-play").innerHTML = ICON_PAUSE; $("rd-play").setAttribute("aria-label", "Anhalten");
+  let wait = 0;
+  const tick = () => {
+    if (!R.playing) return;
+    const next = R.frames[(R.idx + 1) % R.frames.length], layer = next && R.layers.get(next.ts + "/" + next.lead);
+    if (layer && layer.isLoading && layer.isLoading() && wait < 6) { wait++; R.timer = setTimeout(tick, 250); return; }
+    wait = 0;
+    const atEnd = R.idx === R.frames.length - 1;
+    radarShow(atEnd ? 0 : R.idx + 1);
+    R.timer = setTimeout(tick, R.idx === R.frames.length - 1 ? 1800 : R.idx === R.lastObs ? 1200 : 550);
+  };
+  if (R.idx === R.frames.length - 1) radarShow(0);
+  R.timer = setTimeout(tick, 400);
+}
+function radarStop() { R.playing = false; clearTimeout(R.timer); const b = $("rd-play"); if (b) { b.innerHTML = ICON_PLAY; b.setAttribute("aria-label", "Abspielen"); } }
+function radarLegend(lg, info) {
+  const bins = (lg && lg.bins) || [];
+  const hail = /HAIL/i.test((info && info.quantity) || "");
+  const el = $("rd-legend");
+  if (!bins.length) { el.innerHTML = ""; return; }
+  if (bins.length <= 8) {
+    el.innerHTML = `<span class="muted">${hail ? "Hagelgröße" : "Niederschlag"}:</span>` + bins.map(b => { const t = b.label || (b.open_ended ? `ab ${fmtInt(b.min)}` : `${fmtInt(b.min)}–${fmtInt(b.max)}`) + (hail ? " mm" : " dBZ"); return `<span><i style="background:${b.color}"></i>${esc(t.charAt(0).toUpperCase() + t.slice(1))}</span>`; }).join("");
+    return;
+  }
+  if (hail) {
+    const rain = bins.filter(b => b.max != null && b.max <= 0.01 || (b.label || "").includes("dBZ"));
+    const ice = bins.filter(b => !rain.includes(b));
+    const pos = v => { const i = ice.findIndex(b => b.min >= v); return ((i < 0 ? ice.length - 1 : i) / ice.length * 100).toFixed(1); };
+    el.innerHTML = `<span class="muted">Regen ohne Hagel:</span><div class="rd-seg" style="width:72px;flex:none">${rain.map(b => `<i title="${esc(b.label || "")}" style="background:${b.color}"></i>`).join("")}</div>
+      <span class="muted">Hagel:</span><div class="rd-strip"><div class="rd-seg">${ice.map(b => `<i title="${esc(b.label || "")}" style="background:${b.color}"></i>`).join("")}</div>
+      <div class="rd-anch">${[[5, "5 mm"], [10, "1 cm"], [20, "2 cm"], [40, "4 cm"], [60, "6 cm"]].map(([v, t]) => `<span style="left:${pos(v)}%">${t}</span>`).join("")}</div></div>`;
+    return;
+  }
+  // Viele Stufen: Farbstreifen mit Ankern
+  const word = v => hail ? `${fmtInt(v)} mm` : v < 19 ? "sehr leicht" : v < 28 ? "leicht" : v < 37 ? "mäßig" : v < 46 ? "stark" : v < 55 ? "sehr stark" : "extrem, Hagel";
+  const anchors = hail ? [] : [[10, "leicht"], [28, "mäßig"], [37, "stark"], [46, "sehr stark"], [55, "Hagel"]];
+  const seg = bins.map(b => `<i title="${esc((b.open_ended ? "ab " + fmtInt(b.min) : fmtInt(b.min) + "–" + fmtInt(b.max)) + (hail ? " mm" : " dBZ") + " · " + word(b.min))}" style="background:${b.color}"></i>`).join("");
+  const n = bins.length, pos = v => { const i = bins.findIndex(b => b.min >= v); return ((i < 0 ? n - 1 : i) / n * 100).toFixed(1); };
+  el.innerHTML = `<span class="muted">${hail ? "Hagelgröße" : "Niederschlag"}:</span><div class="rd-strip"><div class="rd-seg">${seg}</div><div class="rd-anch">${anchors.map(([v, t]) => `<span style="left:${pos(v)}%">${t}</span>`).join("")}</div></div>`;
+}
+const ICON_PLAY = `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>`;
+const ICON_PAUSE = `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="currentColor"/></svg>`;
+
 /* ---------------- Footer ---------------- */
 function renderFooter() {
   const days = allDays();
@@ -1991,7 +2183,7 @@ function renderFooter() {
 
 /* ---------------- Gesamt-Render ---------------- */
 function renderAll() {
-  const fns = [renderNow, renderCompare, renderForecast, renderHistory, renderRecords, renderYear, renderCalendar, renderRain, renderKenn, renderMonths, renderWind, renderOTD, renderFooter];
+  const fns = [renderNow, renderCompare, renderRadar, renderForecast, renderHistory, renderRecords, renderYear, renderCalendar, renderRain, renderKenn, renderMonths, renderWind, renderOTD, renderFooter];
   for (const f of fns) { try { f(); } catch (e) { console.error(f.name, e); } }
   tickStatus();
 }
@@ -2046,6 +2238,10 @@ function initUI() {
   $("fc-picker").addEventListener("click", e => { const b = e.target.closest(".mp"); if (b) selectModel(b.dataset.m); });
   $("tbl-mm").addEventListener("click", e => { const b = e.target.closest("button.mrow"); if (b) selectModel(b.dataset.m); });
   bindSeg("seg-mg", v => { S.mgRange = +v; renderForecast(); });
+  bindSeg("seg-rd", v => { if (R.map) radarMode(v).catch(e => { $("rd-note").textContent = e.message; }); else R.mode = v; });
+  $("rd-play").addEventListener("click", () => radarPlay());
+  $("rd-slider").addEventListener("input", e => { radarStop(); radarShow(+e.target.value); });
+  $("rd-center").addEventListener("click", () => { if (R.map) R.map.setView(R.center, Math.max(R.map.getZoom(), 8)); });
   bindSeg("seg-mm", v => { S.mmMetric = v; renderForecast(); });
   bindSeg("seg-rec", v => { S.recScope = v; renderRecords(); });
   bindSeg("seg-year", v => { S.year = +v; renderYear(); });

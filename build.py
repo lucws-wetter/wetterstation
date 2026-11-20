@@ -7,7 +7,7 @@
 
 Einstellungen: settings.json (öffentlich). Schlüssel: config.local.json (privat, nicht im Repository).
 """
-import json, sys, pathlib
+import json, os, sys, pathlib
 root = pathlib.Path(__file__).parent
 mode = sys.argv[1] if len(sys.argv) > 1 else "site"
 snap_path = sys.argv[2] if len(sys.argv) > 2 else None
@@ -27,7 +27,8 @@ if mode == "live":
 elif mode == "share":
     conf = {**base, "hideControls": True, "hideLocation": True}
 elif mode == "site":
-    conf = {**base, "dataUrl": "data.json", "hideLocation": True}
+    conf = {**base, "dataUrl": "data.json", "hideLocation": True,
+            "radarProxy": os.environ.get("RADAR_PROXY", settings.get("radarProxy", ""))}
     snapshot = None
 else:
     sys.exit("Modus muss site, live oder share sein.")
